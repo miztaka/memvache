@@ -3,6 +3,9 @@ package net.vvakame.memvache;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
+
+import org.apache.commons.codec.digest.DigestUtils;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.memcache.MemcacheService;
@@ -24,6 +27,8 @@ import com.google.storage.onestore.v3.OnestoreEntity.Reference;
  * @author vvakame
  */
 public class GetPutCacheStrategy extends RpcVisitor {
+	
+	private final static Logger logger =  Logger.getLogger(GetPutCacheStrategy.class.getName());
 
 	static final int PRIORITY = QueryKeysOnlyStrategy.PRIORITY + 1000;
 
@@ -35,13 +40,15 @@ public class GetPutCacheStrategy extends RpcVisitor {
 
 
 	/** オリジナルのリクエストが要求しているKeyの一覧, リクエスト毎 */
-	Map<GetRequest, List<Key>> requestKeysMap = new HashMap<GetRequest, List<Key>>();
+	//Map<GetRequest, List<Key>> requestKeysMap = new HashMap<GetRequest, List<Key>>();
+	Map<String, List<Key>> requestKeysMap = new HashMap<String, List<Key>>();
 
 	/** Memcacheが持っていたEntityのキャッシュ, リクエスト毎 */
-	Map<GetRequest, Map<Key, Entity>> dataMap = new HashMap<GetRequest, Map<Key, Entity>>();
+	//Map<GetRequest, Map<Key, Entity>> dataMap = new HashMap<GetRequest, Map<Key, Entity>>();
+	Map<String, Map<Key, Entity>> dataMap = new HashMap<String, Map<Key, Entity>>();
 
 	/** 同一操作を行ったカウント数, リクエスト毎 */
-	Map<GetRequest, Integer> requestCountMap = new HashMap<GetRequest, Integer>();
+	//Map<GetRequest, Integer> requestCountMap = new HashMap<GetRequest, Integer>();
 
 	Map<Long, Map<Key, Entity>> putUnderTx = new HashMap<Long, Map<Key, Entity>>();
 
@@ -54,6 +61,7 @@ public class GetPutCacheStrategy extends RpcVisitor {
 	 */
 	@Override
 	public Pair<byte[], byte[]> pre_datastore_v3_Get(GetRequest requestPb) {
+		logger.fine("pre_datastore_v3_Get: " + this);
 		if (requestPb.getTransaction().hasApp()) {
 			// under transaction
 			// 操作するEGに対してマークを付けさせるためにDatastoreに素通しする必要がある。
@@ -89,7 +97,7 @@ public class GetPutCacheStrategy extends RpcVisitor {
 				}
 				responsePb.addEntity(entity);
 			}
-
+			logger.fine("all data was retrieved from memcache. finish.");
 			return Pair.response(responsePb.toByteArray());
 		}
 
@@ -99,7 +107,18 @@ public class GetPutCacheStrategy extends RpcVisitor {
 				requestPb.removeKey(i);
 			}
 		}
-
+		logger.fine("key size: " + requestKeys.size() + " cache hit size: " + data.size());
+		logger.fine("continue to get from datastore. ");
+		
+		// レスポンスのためにリクエストと紐付けてMapに持っておく
+		byte[] requestByte = requestPb.toByteArray();
+		String digest = DigestUtils.md5Hex(requestByte);
+		requestKeysMap.put(digest, requestKeys);
+		dataMap.put(digest, data);
+		logger.fine("save data with digest: " + digest);
+		return Pair.request(requestByte);
+		
+		/*
 		// post_datastore_v3_Getで渡されるrequestPbは再構成後のものなので
 		byte[] reconstructured = requestPb.toByteArray();
 		{
@@ -117,6 +136,7 @@ public class GetPutCacheStrategy extends RpcVisitor {
 		}
 
 		return Pair.request(reconstructured);
+		*/
 	}
 
 	/**
@@ -126,6 +146,8 @@ public class GetPutCacheStrategy extends RpcVisitor {
 	 */
 	@Override
 	public byte[] post_datastore_v3_Get(GetRequest requestPb, GetResponse responsePb) {
+		logger.fine("post_datastore_v3_Get: " + this);
+		logger.fine("requestPb: " + requestPb);
 		if (requestPb.getTransaction().hasApp()) {
 			// under transaction
 			return null;
@@ -143,10 +165,17 @@ public class GetPutCacheStrategy extends RpcVisitor {
 		}
 		MemcacheService memcache = MemvacheDelegate.getMemcache();
 		memcache.putAll(newMap);
+		logger.fine("get from datastore size: " + newMap.size());
 
 		// ここで取れてきているのはキャッシュにないヤツだけなので再構成して返す必要がある
-		Map<Key, Entity> data;
-		List<Key> requestKeys;
+		byte[] requestByte = requestPb.toByteArray();
+		String digest = DigestUtils.md5Hex(requestByte);
+		logger.fine("digest = " + digest);
+		logger.fine("dataMap size: " + dataMap.size());
+		Map<Key, Entity> data = dataMap.get(digest);
+		logger.fine("the data is " + data);
+		List<Key> requestKeys = requestKeysMap.get(digest);
+		/*
 		{
 			Integer count = requestCountMap.get(requestPb);
 			if (count == 1) {
@@ -159,6 +188,7 @@ public class GetPutCacheStrategy extends RpcVisitor {
 				requestCountMap.put(requestPb, count - 1);
 			}
 		}
+		*/
 		data.putAll(newMap);
 		responsePb.clearEntity();
 		for (Key key : requestKeys) {

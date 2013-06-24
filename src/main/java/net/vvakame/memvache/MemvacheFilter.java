@@ -1,7 +1,6 @@
 package net.vvakame.memvache;
 
 import java.io.IOException;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.servlet.Filter;
@@ -64,15 +63,18 @@ public class MemvacheFilter implements Filter {
 			MemvacheDelegate.removeStrategy(AggressiveQueryCacheStrategy.class);
 		}
 		RpcVisitor.debug = debug;
+		
+		MemvacheDelegate delegate = MemvacheDelegate.install();
 	}
 
 	@Override
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
 
+		/*
 		MemvacheDelegate delegate = null;
 		try {
-			delegate = MemvacheDelegate.install();
+			delegate = MemvacheDelegate.install(); 
 			preProcess(delegate);
 		} catch (Throwable th) {
 			logger.log(Level.INFO, "failed to create api call log.");
@@ -84,10 +86,12 @@ public class MemvacheFilter implements Filter {
 				doThrow(th);
 			} finally {
 				if (delegate != null) {
-					delegate.uninstall();
+					//delegate.uninstall();
 				}
 			}
 		}
+		*/
+		chain.doFilter(request, response);
 	}
 
 	protected void preProcess(MemvacheDelegate delegate) {

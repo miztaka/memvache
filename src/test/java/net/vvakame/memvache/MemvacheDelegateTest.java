@@ -68,10 +68,10 @@ public class MemvacheDelegateTest extends AppEngineTestCase {
 
 		memvacheDelegate = MemvacheDelegate.install();
 
-		List<Strategy> strategies = memvacheDelegate.strategies.get();
-		assertThat(strategies.get(0), instanceOf(AggressiveQueryCacheStrategy.class));
-		assertThat(strategies.get(1), instanceOf(QueryKeysOnlyStrategy.class));
-		assertThat(strategies.get(2), instanceOf(GetPutCacheStrategy.class));
+		//List<Strategy> strategies = memvacheDelegate.strategies.get();
+		//assertThat(strategies.get(0), instanceOf(AggressiveQueryCacheStrategy.class));
+		//assertThat(strategies.get(1), instanceOf(QueryKeysOnlyStrategy.class));
+		//assertThat(strategies.get(2), instanceOf(GetPutCacheStrategy.class));
 	}
 
 	@Override
