@@ -86,9 +86,10 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 	}
 	
 	/**
-	 * リクエストの終わりにストラテジーのインスタンスをクリアする。
+	 * ストラテジーのインスタンスをクリアする。
 	 */
-	public void requestFinished() {
+	public void initStrategies() {
+		logger.fine("localStrategiesを初期化します。" + Thread.currentThread().getId());
 		localStrategies.set(null);
 	}
 	

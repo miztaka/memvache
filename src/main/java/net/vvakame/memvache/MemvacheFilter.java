@@ -35,10 +35,12 @@ public class MemvacheFilter implements Filter {
 	@Override
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
+		
+		// ストラテジーの初期化
+		delegate.initStrategies();
+		
 		chain.doFilter(request, response);
 		
-		// ストラテジーをクリア
-		delegate.requestFinished();
 	}
 
 	protected void preProcess(MemvacheDelegate delegate) {
