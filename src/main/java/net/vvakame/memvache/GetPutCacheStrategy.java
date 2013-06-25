@@ -61,7 +61,7 @@ public class GetPutCacheStrategy extends RpcVisitor {
 	 */
 	@Override
 	public Pair<byte[], byte[]> pre_datastore_v3_Get(GetRequest requestPb) {
-		logger.fine("pre_datastore_v3_Get: " + this);
+		logger.fine("pre_datastore_v3_Get: " + Thread.currentThread().getId() + " " + this);
 		if (requestPb.getTransaction().hasApp()) {
 			// under transaction
 			// 操作するEGに対してマークを付けさせるためにDatastoreに素通しする必要がある。
@@ -147,7 +147,6 @@ public class GetPutCacheStrategy extends RpcVisitor {
 	@Override
 	public byte[] post_datastore_v3_Get(GetRequest requestPb, GetResponse responsePb) {
 		logger.fine("post_datastore_v3_Get: " + this);
-		logger.fine("requestPb: " + requestPb);
 		if (requestPb.getTransaction().hasApp()) {
 			// under transaction
 			return null;
@@ -173,7 +172,6 @@ public class GetPutCacheStrategy extends RpcVisitor {
 		logger.fine("digest = " + digest);
 		logger.fine("dataMap size: " + dataMap.size());
 		Map<Key, Entity> data = dataMap.get(digest);
-		logger.fine("the data is " + data);
 		List<Key> requestKeys = requestKeysMap.get(digest);
 		/*
 		{

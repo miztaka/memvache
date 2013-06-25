@@ -17,81 +17,28 @@ import javax.servlet.ServletResponse;
 public class MemvacheFilter implements Filter {
 
 	static final Logger logger = Logger.getLogger(MemvacheFilter.class.getSimpleName());
-
+	
+	MemvacheDelegate delegate;
 
 	@Override
 	public void init(FilterConfig filterConfig) {
-		boolean enableGetPutCache = true;
-		boolean enableQueryKeysOnly = true;
-		boolean enableAggressiveQueryCache = false;
-
-		boolean debug = false;
-
-		try {
-			String getPutCache = filterConfig.getInitParameter("enableGetPutCacheStrategy");
-			if (!isEmpty(getPutCache)) {
-				enableGetPutCache = Boolean.valueOf(getPutCache);
-			}
-			String queryKeysOnly = filterConfig.getInitParameter("enableQueryKeysOnlyStrategy");
-			if (!isEmpty(queryKeysOnly)) {
-				enableQueryKeysOnly = Boolean.valueOf(queryKeysOnly);
-			}
-			String aggressiveQueryCache =
-					filterConfig.getInitParameter("enableAggressiveQueryCacheStrategy");
-			if (!isEmpty(aggressiveQueryCache)) {
-				enableAggressiveQueryCache = Boolean.valueOf(aggressiveQueryCache);
-			}
-			String debugMode = filterConfig.getInitParameter("enableDebugMode");
-			if (!isEmpty(debugMode)) {
-				debug = Boolean.valueOf(debugMode);
-			}
-		} catch (Exception e) {
-		}
-		if (enableGetPutCache) {
-			MemvacheDelegate.addStrategy(GetPutCacheStrategy.class);
-		} else {
-			MemvacheDelegate.removeStrategy(GetPutCacheStrategy.class);
-		}
-		if (enableQueryKeysOnly) {
-			MemvacheDelegate.addStrategy(QueryKeysOnlyStrategy.class);
-		} else {
-			MemvacheDelegate.removeStrategy(QueryKeysOnlyStrategy.class);
-		}
-		if (enableAggressiveQueryCache) {
-			MemvacheDelegate.addStrategy(AggressiveQueryCacheStrategy.class);
-		} else {
-			MemvacheDelegate.removeStrategy(AggressiveQueryCacheStrategy.class);
-		}
-		RpcVisitor.debug = debug;
 		
-		MemvacheDelegate delegate = MemvacheDelegate.install();
+		RpcVisitor.debug = false;
+		delegate = MemvacheDelegate.install(
+			StrategyBuilder.newBuilder()
+				.addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
+				.addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
+				.buid()
+		);
 	}
 
 	@Override
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
-
-		/*
-		MemvacheDelegate delegate = null;
-		try {
-			delegate = MemvacheDelegate.install(); 
-			preProcess(delegate);
-		} catch (Throwable th) {
-			logger.log(Level.INFO, "failed to create api call log.");
-		} finally {
-			try {
-				chain.doFilter(request, response);
-			} catch (Throwable th) {
-				logger.log(Level.INFO, "failed to save accesslog.", th);
-				doThrow(th);
-			} finally {
-				if (delegate != null) {
-					//delegate.uninstall();
-				}
-			}
-		}
-		*/
 		chain.doFilter(request, response);
+		
+		// ストラテジーをクリア
+		delegate.requestFinished();
 	}
 
 	protected void preProcess(MemvacheDelegate delegate) {
@@ -110,8 +57,5 @@ public class MemvacheFilter implements Filter {
 	@Override
 	public void destroy() {
 	}
-
-	static boolean isEmpty(String str) {
-		return str == null || "".equals(str);
-	}
+	
 }

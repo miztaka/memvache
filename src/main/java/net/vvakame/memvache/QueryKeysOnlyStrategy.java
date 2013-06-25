@@ -10,7 +10,6 @@ import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.EntityTranslatorPublic;
 import com.google.appengine.api.datastore.Key;
-import com.google.apphosting.api.DatastorePb;
 import com.google.apphosting.api.DatastorePb.Cursor;
 import com.google.apphosting.api.DatastorePb.NextRequest;
 import com.google.apphosting.api.DatastorePb.Query;
@@ -116,7 +115,8 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 
 	/**
 	 * keysOnlyのQueryResultに肉付けをする処理
-	 * TODO どうせDatastore呼び出しがGetPutストラテジーでtrapされるからここでMemcache呼び出しは要らないような。。
+	 * Memcache呼び出しはGetPutStrategyに任せる
+	 * 
 	 * @param responsePb
 	 */
 	void reconstructQueryResult(QueryResult responsePb) {
@@ -133,7 +133,25 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 			keys = PbKeyUtil.toKeys(requestedKeys);
 			logger.fine("key count: " + keys.size());
 		}
+		
+		// EntityをBatchGet(Memcacheからの取得はGetPutCacheStrategyにお任せ)
+		DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
+		Map<Key, Entity> batchGet = datastore.get(keys);
+		logger.log(Level.FINE, "batchGet count: " + batchGet.size());
+		
+		// 検索結果を組み立てる
+		responsePb.setKeysOnly(false);
+		responsePb.clearResult();
+		for (Key key : keys) {
+			//Entity entityByGet = (batchGet == null) ? null : batchGet.get(key);
+			Entity entityByGet = batchGet.get(key);
+			if (entityByGet != null) {
+				EntityProto proto = EntityTranslatorPublic.convertToPb(entityByGet);
+				responsePb.addResult(proto);
+			}
+		}
 
+		/*
 		// MemcacheからEntity部分を取得
 		Map<Key, DatastorePb.GetResponse.Entity> cached;
 		{
@@ -173,5 +191,6 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 				}
 			}
 		}
+		*/
 	}
 }

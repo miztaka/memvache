@@ -4,7 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import net.vvakame.memvache.GetPutCacheStrategy;
 import net.vvakame.memvache.MemvacheDelegate;
+import net.vvakame.memvache.QueryKeysOnlyStrategy;
+import net.vvakame.memvache.StrategyBuilder;
 
 import org.junit.Test;
 import org.slim3.datastore.Datastore;
@@ -60,7 +63,12 @@ public class GetAsMapTest extends ControllerTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 
-		memvacheDelegate = MemvacheDelegate.install();
+		memvacheDelegate = MemvacheDelegate.install(
+				StrategyBuilder.newBuilder()
+				.addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
+				.addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
+				.buid()
+				);
 	}
 
 	@Override

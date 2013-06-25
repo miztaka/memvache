@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.vvakame.memvache.MemcacheServiceWrapper;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -39,7 +41,6 @@ import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.api.datastore.Query;
 import com.google.appengine.api.memcache.InvalidValueException;
 import com.google.appengine.api.memcache.MemcacheService;
-import com.google.appengine.api.memcache.MemcacheServiceFactory;
 
 /**
  * Cache service.
@@ -73,7 +74,8 @@ public class CacheService {
 	 * Initialize cache service.
 	 */
 	public CacheService() {
-	    globalCache = MemcacheServiceFactory.getMemcacheService();
+		//globalCache = MemcacheServiceFactory.getMemcacheService();
+		globalCache = new MemcacheServiceWrapper(3000L);
         localCache = new HashMap<String, Object>();
         localCacheTime = System.currentTimeMillis();
 	}

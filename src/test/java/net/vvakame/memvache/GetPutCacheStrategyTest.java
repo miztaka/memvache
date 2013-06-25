@@ -202,7 +202,8 @@ public class GetPutCacheStrategyTest extends ControllerTestCase {
 		// かならず RpcCounterDelegate が最初
 		countDelegate = RpcCounterDelegate.install();
 
-		memvacheDelegate = MemvacheDelegate.install();
+		memvacheDelegate = MemvacheDelegate.install(
+				StrategyBuilder.newBuilder().addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class).buid());
 		//memvacheDelegate.strategies.get().clear();
 		//memvacheDelegate.strategies.get().add(new GetPutCacheStrategy());
 	}

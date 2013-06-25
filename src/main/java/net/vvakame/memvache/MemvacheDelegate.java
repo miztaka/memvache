@@ -1,16 +1,14 @@
 package net.vvakame.memvache;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.appengine.api.memcache.MemcacheService;
-import com.google.appengine.api.memcache.MemcacheServiceFactory;
 import com.google.apphosting.api.ApiProxy;
 import com.google.apphosting.api.ApiProxy.ApiConfig;
 import com.google.apphosting.api.ApiProxy.ApiProxyException;
@@ -25,145 +23,102 @@ import com.google.apphosting.api.ApiProxy.LogRecord;
  */
 public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 	
+	private static final long RPC_TIMEOUT = 3000L;
+
 	static final Logger logger = Logger.getLogger(MemvacheDelegate.class.getName());
-
-	//static final ThreadLocal<MemvacheDelegateV2> localThis = new ThreadLocal<MemvacheDelegateV2>();
 	
+	public static final String DATASTORE_V3 = "datastore_v3"; 
+
 	final ApiProxy.Delegate<Environment> parent;
-
-	//List<Strategy> strategies = new ArrayList<Strategy>(3);
-	ThreadLocal<List<Strategy>> localStrategies = new ThreadLocal<List<Strategy>>();
-
-	static Set<Class<? extends Strategy>> enabledStrategies =
-			new LinkedHashSet<Class<? extends Strategy>>();
-
-	static {
-		staticInitialize();
-	}
-
-
-	static void staticInitialize() {
-		enabledStrategies.clear();
-		addStrategy(AggressiveQueryCacheStrategy.class);
-		addStrategy(QueryKeysOnlyStrategy.class);
-		addStrategy(GetPutCacheStrategy.class);
-		RpcVisitor.debug = false;
-	}
-
+	
 	/**
-	 * 現在のスレッドに紐付いている {@link MemvacheDelegateV2} を取得する。
-	 * @return スレッドに紐付く {@link MemvacheDelegateV2}
-	 * @author vvakame
+	 * 各サービスごとに適用するストラテジーの設定
 	 */
-	/*
-	public static MemvacheDelegateV2 get() {
-		return localThis.get();
-	}
-	*/
+	final private Map<String,List<Class<? extends Strategy>>> strategyConfig;
 
 	/**
-	 * {@link MemvacheDelegateV2}を{@link ApiProxy}に設定する。
+	 * スレッドローカルなストラテジーのインスタンス
+	 */
+	ThreadLocal<Map<String, List<Strategy>>> localStrategies = new ThreadLocal<Map<String, List<Strategy>>>();
+
+	/**
+	 * {@link MemvacheDelegate}を{@link ApiProxy}に設定する。
 	 * <p>
 	 * 現在{@link ApiProxy}に設定されている
 	 * {@link com.google.apphosting.api.ApiProxy.Delegate}が
 	 * {@link MemvacheDelegateV2}だった場合は何もしない。
 	 * </p>
 	 * 
-	 * @return 新たに作成した{@link MemvacheDelegateV2}か、 既に適用済みだった場合は元々設定されていた
-	 *         {@link MemvacheDelegateV2}
+	 * @return 新たに作成した{@link MemvacheDelegate}か、 既に適用済みだった場合は元々設定されていた
+	 *         {@link MemvacheDelegate}
 	 */
-	public static MemvacheDelegate install() {
-		logger.log(Level.FINE, "MemvacheDelegate install called.");
+	public static MemvacheDelegate install(Map<String,List<Class<? extends Strategy>>> config) {
+		logger.fine("MemvacheDelegate install called.");
 		@SuppressWarnings("unchecked")
 		Delegate<Environment> originalDelegate = ApiProxy.getDelegate();
 		if (originalDelegate instanceof MemvacheDelegate == false) {
-			MemvacheDelegate newDelegate = new MemvacheDelegate(originalDelegate);
-			//setupStrategies(newDelegate);
+			MemvacheDelegate newDelegate = new MemvacheDelegate(originalDelegate, config);
 			ApiProxy.setDelegate(newDelegate);
-			//localThis.set(newDelegate);
 			return newDelegate;
 		} else {
-			logger.log(Level.WARNING, "original Delegate is MemvacheDelegate");
+			logger.warning("original Delegate is MemvacheDelegate");
 			MemvacheDelegate delegate = (MemvacheDelegate) originalDelegate;
-			//setupStrategies(delegate);
 			return delegate;
 		}
 	}
 
 	/**
-	 * キャッシュに利用する戦略を追加する。
-	 * @param clazz 追加する戦略
-	 * @author vvakame
-	 */
-	public static void addStrategy(Class<? extends Strategy> clazz) {
-		enabledStrategies.add(clazz);
-	}
-
-	/**
-	 * キャッシュに利用する戦略を削除する。
-	 * @param clazz 削除する戦略
-	 * @author vvakame
-	 */
-	public static void removeStrategy(Class<? extends Strategy> clazz) {
-		enabledStrategies.remove(clazz);
-	}
-
-	/*
-	static void setupStrategies(MemvacheDelegateV2 memvache) {
-		memvache.strategies.clear();
-		try {
-			for (Class<? extends Strategy> clazz : enabledStrategies) {
-				memvache.strategies.add(clazz.newInstance());
-			}
-		} catch (InstantiationException e) {
-			throw new RuntimeException(e);
-		} catch (IllegalAccessException e) {
-			throw new RuntimeException(e);
-		}
-	}
-	*/
-
-	/**
-	 * {@link MemvacheDelegateV2}を{@link ApiProxy}からはずす。
+	 * {@link MemvacheDelegate}を{@link ApiProxy}からはずす。
 	 * 
 	 * @param originalDelegate
 	 *            元々設定されていた{@link com.google.apphosting.api.ApiProxy.Delegate}.
-	 *            {@link MemvacheDelegateV2#getParent()}を使用すると良い。
+	 *            {@link MemvacheDelegate#getParent()}を使用すると良い。
 	 */
 	public static void uninstall(Delegate<Environment> originalDelegate) {
-		//localThis.set(null);
 		ApiProxy.setDelegate(originalDelegate);
 	}
 
 	/**
-	 * {@link MemvacheDelegateV2}を{@link ApiProxy}からはずす。
+	 * {@link MemvacheDelegate}を{@link ApiProxy}からはずす。
 	 */
 	public void uninstall() {
-		//localThis.set(null);
 		ApiProxy.setDelegate(parent);
+	}
+	
+	/**
+	 * リクエストの終わりにストラテジーのインスタンスをクリアする。
+	 */
+	public void requestFinished() {
+		localStrategies.set(null);
 	}
 	
 	/**
 	 * スレッドローカルなStrategyのListを取得します。
 	 * @return
 	 */
-	private List<Strategy> getLocalStrategies() {
+	private List<Strategy> getLocalStrategies(String service) {
 		
-		List<Strategy> strategies = localStrategies.get();
+		Map<String, List<Strategy>> strategies = localStrategies.get();
 		if (strategies == null) {
-			strategies = new ArrayList<Strategy>(3);
-			for (Class<? extends Strategy> clazz : enabledStrategies) {
-				try {
-					strategies.add(clazz.newInstance());
-				} catch (InstantiationException e) {
-					throw new RuntimeException(e);
-				} catch (IllegalAccessException e) {
-					throw new RuntimeException(e);
+			logger.info("localStrategiesを構築します。 " + Thread.currentThread().getId());
+			// 全サービスのストラテジーをインスタンス化
+			strategies = new HashMap<String, List<Strategy>>();
+			for (String key: strategyConfig.keySet()) {
+				List<Strategy> list = new ArrayList<Strategy>();
+				strategies.put(key, list);
+				for (Class<? extends Strategy> clazz: strategyConfig.get(key)) {
+					try {
+						list.add(clazz.newInstance());
+					} catch (InstantiationException e) {
+						throw new RuntimeException(e);
+					} catch (IllegalAccessException e) {
+						throw new RuntimeException(e);
+					}
 				}
 			}
 			localStrategies.set(strategies);
 		}
-		return strategies;
+		return strategies.get(service);
 	}
 
 	@Override
@@ -176,10 +131,10 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 	Future<byte[]> processAsyncCall(Environment env, final String service, final String method,
 			final byte[] requestBytes, ApiConfig config, int depth) {
 
-		List<Strategy> strategies = getLocalStrategies();
+		List<Strategy> strategies = getLocalStrategies(service);
 		
 		// 適用すべき戦略がなかったら実際のRPCを行う
-		if (strategies.size() == depth) {
+		if (strategies == null || strategies.size() == depth) {
 			return getParent().makeAsyncCall(env, service, method, requestBytes, config);
 		}
 
@@ -230,10 +185,10 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 	byte[] processSyncCall(Environment env, String service, String method, byte[] requestBytes,
 			int depth) {
 		
-		List<Strategy> strategies = getLocalStrategies();
+		List<Strategy> strategies = getLocalStrategies(service);
 
 		// 適用すべき戦略がなかったら実際のRPCを行う
-		if (strategies.size() == depth) {
+		if (strategies == null || strategies.size() == depth) {
 			return getParent().makeSyncCall(env, service, method, requestBytes);
 		}
 
@@ -264,11 +219,14 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 
 	/**
 	 * Namespaceがセット済みの {@link MemcacheService} を取得する。
+	 * ※NamespaceがセットされていないMemcacheServiceWrapperを返すように変更。(タイムアウト設定のため)
+	 * 
 	 * @return {@link MemcacheService}
 	 * @author vvakame
 	 */
 	public static MemcacheService getMemcache() {
-		return MemcacheServiceFactory.getMemcacheService("memvache");
+		//return MemcacheServiceFactory.getMemcacheService("memvache");
+		return new MemcacheServiceWrapper(RPC_TIMEOUT);
 	}
 
 	/**
@@ -313,8 +271,9 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 	 * @param delegate
 	 * @category constructor
 	 */
-	MemvacheDelegate(Delegate<Environment> delegate) {
+	MemvacheDelegate(Delegate<Environment> delegate, Map<String,List<Class<? extends Strategy>>> config) {
 		this.parent = delegate;
+		this.strategyConfig = config;
 	}
 
 	@Override

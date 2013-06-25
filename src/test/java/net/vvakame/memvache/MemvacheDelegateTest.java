@@ -57,6 +57,7 @@ public class MemvacheDelegateTest extends AppEngineTestCase {
 	 * テストケース。
 	 * @author vvakame
 	 */
+	/*
 	@Test
 	public void priority() {
 		memvacheDelegate.uninstall();
@@ -73,12 +74,18 @@ public class MemvacheDelegateTest extends AppEngineTestCase {
 		//assertThat(strategies.get(1), instanceOf(QueryKeysOnlyStrategy.class));
 		//assertThat(strategies.get(2), instanceOf(GetPutCacheStrategy.class));
 	}
+	*/
 
 	@Override
 	public void setUp() throws Exception {
 		super.setUp();
 
-		memvacheDelegate = MemvacheDelegate.install();
+		memvacheDelegate = MemvacheDelegate.install(
+			StrategyBuilder.newBuilder()
+			.addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
+			.addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
+			.buid()
+			);
 	}
 
 	@Override
