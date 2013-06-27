@@ -101,7 +101,7 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 		
 		Map<String, List<Strategy>> strategies = localStrategies.get();
 		if (strategies == null) {
-			logger.info("localStrategiesを構築します。 " + Thread.currentThread().getId());
+			logger.fine("localStrategiesを構築します。 " + Thread.currentThread().getId());
 			// 全サービスのストラテジーをインスタンス化
 			strategies = new HashMap<String, List<Strategy>>();
 			for (String key: strategyConfig.keySet()) {
@@ -125,7 +125,6 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 	@Override
 	public Future<byte[]> makeAsyncCall(Environment env, final String service, final String method,
 			final byte[] requestBytes, ApiConfig config) {
-		
 		return processAsyncCall(env, service, method, requestBytes, config, 0);
 	}
 
@@ -203,14 +202,12 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 
 		// 次の戦略を適用する。もしリクエストが改変されてたらそっちを渡す。
 		byte[] response;
-		if (pair != null && pair.request != null) {
-			response = processSyncCall(env, service, method, pair.request, depth + 1);
-		} else {
-			response = processSyncCall(env, service, method, requestBytes, depth + 1);
-		}
+		byte[] processedRequest = (pair != null && pair.request != null) ?
+				pair.request : requestBytes;
+		response = processSyncCall(env, service, method, processedRequest, depth + 1);
 
 		// responseが改変されてたらそっちを結果として返す
-		byte[] modified = strategy.postProcess(service, method, requestBytes, response);
+		byte[] modified = strategy.postProcess(service, method, processedRequest, response);
 		if (modified != null) {
 			return modified;
 		} else {

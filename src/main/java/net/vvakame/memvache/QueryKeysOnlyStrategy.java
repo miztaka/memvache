@@ -3,13 +3,13 @@ package net.vvakame.memvache;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 
 import com.google.appengine.api.datastore.DatastoreService;
 import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.EntityTranslatorPublic;
 import com.google.appengine.api.datastore.Key;
+import com.google.apphosting.api.DatastorePb;
 import com.google.apphosting.api.DatastorePb.Cursor;
 import com.google.apphosting.api.DatastorePb.NextRequest;
 import com.google.apphosting.api.DatastorePb.Query;
@@ -32,11 +32,9 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 		return PRIORITY;
 	}
 
-
 	List<Query> rewritedQuery = new ArrayList<Query>();
 
 	List<Cursor> rewritedCursor = new ArrayList<Cursor>();
-
 
 	/**
 	 * DatastoreのQueryについて、KeysOnlyがfalseの場合はtrueに書き換える。
@@ -57,8 +55,6 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 		rewritedQuery.add(requestPb);
 		
 		logger.fine("rerwite query to keys only: " + requestPb.getKind());
-		logger.fine(Thread.currentThread().getId() + " " + this);
-
 		return Pair.request(requestPb.toByteArray());
 	}
 
@@ -73,7 +69,7 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 		logger.fine("post_datastore_v3_RunQuery start: " + Thread.currentThread().getId() + " " + this);
 		
 		if (!rewritedQuery.contains(requestPb)) {
-			logger.fine("not rewritedQuery: return null.");
+			logger.fine("not rewritedQuery: do nothing.");
 			return null;
 		}
 
@@ -134,6 +130,7 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 			logger.fine("key count: " + keys.size());
 		}
 		
+		/*
 		// EntityをBatchGet(Memcacheからの取得はGetPutCacheStrategyにお任せ)
 		DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
 		Map<Key, Entity> batchGet = datastore.get(keys);
@@ -150,8 +147,8 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 				responsePb.addResult(proto);
 			}
 		}
+		*/
 
-		/*
 		// MemcacheからEntity部分を取得
 		Map<Key, DatastorePb.GetResponse.Entity> cached;
 		{
@@ -172,7 +169,7 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 
 			DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
 			batchGet = datastore.get(missingKeys);
-			logger.log(Level.FINE, "batchGet count: " + batchGet.size());
+			logger.fine("batchGet count: " + batchGet.size());
 		}
 
 		// 1つの検索結果であるかのように組み立てる
@@ -191,6 +188,5 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 				}
 			}
 		}
-		*/
 	}
 }

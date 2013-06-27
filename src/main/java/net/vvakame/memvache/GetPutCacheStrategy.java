@@ -146,7 +146,7 @@ public class GetPutCacheStrategy extends RpcVisitor {
 	 */
 	@Override
 	public byte[] post_datastore_v3_Get(GetRequest requestPb, GetResponse responsePb) {
-		logger.fine("post_datastore_v3_Get: " + this);
+		logger.fine("post_datastore_v3_Get: " + Thread.currentThread().getId() + " " + this);
 		if (requestPb.getTransaction().hasApp()) {
 			// under transaction
 			return null;
@@ -171,8 +171,8 @@ public class GetPutCacheStrategy extends RpcVisitor {
 		String digest = DigestUtils.md5Hex(requestByte);
 		logger.fine("digest = " + digest);
 		logger.fine("dataMap size: " + dataMap.size());
-		Map<Key, Entity> data = dataMap.get(digest);
-		List<Key> requestKeys = requestKeysMap.get(digest);
+		Map<Key, Entity> data = dataMap.remove(digest);
+		List<Key> requestKeys = requestKeysMap.remove(digest);
 		/*
 		{
 			Integer count = requestCountMap.get(requestPb);

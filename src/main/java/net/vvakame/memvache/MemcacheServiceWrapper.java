@@ -149,7 +149,7 @@ public class MemcacheServiceWrapper implements MemcacheService {
 
 	@Override
 	public boolean put(Object arg0, Object arg1, Expiration arg2, SetPolicy arg3) {
-		return getQuietly(asyncService.put(arg0, arg1, arg2, arg3));
+		return getQuietly(asyncService.put(arg0, arg1, arg2, arg3), 0);
 	}
 
 	@Override
@@ -164,29 +164,29 @@ public class MemcacheServiceWrapper implements MemcacheService {
 
 	@Override
 	public <T> Set<T> putAll(Map<T, ?> arg0, Expiration arg1, SetPolicy arg2) {
-		return getQuietly(asyncService.putAll(arg0, arg1, arg2));
+		return getQuietly(asyncService.putAll(arg0, arg1, arg2), 0);
 	}
 
 	@Override
 	public <T> Set<T> putIfUntouched(Map<T, CasValues> arg0) {
-		return getQuietly(asyncService.putIfUntouched(arg0));
+		return getQuietly(asyncService.putIfUntouched(arg0), 0);
 	}
 
 	@Override
 	public <T> Set<T> putIfUntouched(Map<T, CasValues> arg0, Expiration arg1) {
-		return getQuietly(asyncService.putIfUntouched(arg0, arg1));
+		return getQuietly(asyncService.putIfUntouched(arg0, arg1), 0);
 	}
 
 	@Override
 	public boolean putIfUntouched(Object arg0, IdentifiableValue arg1,
 			Object arg2) {
-		return getQuietly(asyncService.putIfUntouched(arg0, arg1, arg2));
+		return getQuietly(asyncService.putIfUntouched(arg0, arg1, arg2), 0);
 	}
 
 	@Override
 	public boolean putIfUntouched(Object arg0, IdentifiableValue arg1,
 			Object arg2, Expiration arg3) {
-		return getQuietly(asyncService.putIfUntouched(arg0, arg1, arg2, arg3));
+		return getQuietly(asyncService.putIfUntouched(arg0, arg1, arg2, arg3), 0);
 	}
 
 	@Override
@@ -205,12 +205,27 @@ public class MemcacheServiceWrapper implements MemcacheService {
      * @return a value
      */
     private <T> T getQuietly(Future<T> future) {
+    	return getQuietly(future, timeoutMilliSec);
+    }
+
+    /**
+     * Gets a value from the {@link Future} without throwing an exception.
+     * 
+     * @param <T>
+     *            the value type
+     * 
+     * @param future
+     *            the future
+     * @return a value
+     */
+    private <T> T getQuietly(Future<T> future, long millisec) {
         if (future == null) {
             throw new NullPointerException(
                 "The future parameter must not be null.");
         }
         try {
-            return future.get(timeoutMilliSec, TimeUnit.MILLISECONDS);
+            return millisec > 0L ? 
+           		future.get(millisec, TimeUnit.MILLISECONDS) : future.get();
         } catch (ExecutionException e) {
         	logger.severe(e.getMessage());
         } catch (InterruptedException e) {
@@ -220,5 +235,5 @@ public class MemcacheServiceWrapper implements MemcacheService {
 		}
         return null;
     }
-
+    
 }
