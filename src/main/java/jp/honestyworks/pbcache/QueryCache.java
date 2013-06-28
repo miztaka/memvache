@@ -78,7 +78,7 @@ public class QueryCache implements Serializable {
                 logger.debug("class reset date: " + classResetDate);
                 if (classResetDate == null
                         || item.getTimestamp().after(classResetDate)) {
-                    logger.debug("query cache hit: " + kind);
+                	logger.info("STAT:" + kind + ",hit,1");
                     return getCachedQueryResult(item);
                 }
 			}
@@ -86,7 +86,7 @@ public class QueryCache implements Serializable {
 		catch (Exception e) {
 			logger.error(ExceptionUtils.getStackTrace(e));
 		}
-		logger.debug("query cache miss: " + kind);
+		logger.info("STAT:" + kind + ",miss,1");
 		return null;
 	}
 

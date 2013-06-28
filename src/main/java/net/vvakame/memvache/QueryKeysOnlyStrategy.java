@@ -154,7 +154,7 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 		{
 			Map<Key, Object> all = MemvacheDelegate.getMemcache().getAll(keys);
 			cached = MemcacheKeyUtil.conv(all);
-			logger.fine("cached count: " + cached.size());
+			logger.info("STAT:BatchGetKeysOnly,hit," + cached.size());
 		}
 
 		// Memcacheから取得できなかった部分をBatchGet
@@ -169,7 +169,7 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 
 			DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
 			batchGet = datastore.get(missingKeys);
-			logger.fine("batchGet count: " + batchGet.size());
+			logger.info("STAT:BatchGetKeysOnly,miss," + batchGet.size());
 		}
 
 		// 1つの検索結果であるかのように組み立てる
