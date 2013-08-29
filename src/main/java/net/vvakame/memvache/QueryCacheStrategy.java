@@ -136,7 +136,7 @@ public class QueryCacheStrategy extends RpcVisitor {
         Map<String,Integer> buf = new HashMap<String,Integer>();
         for (Reference key: keys) {
         	String kind = getKindFromKey(key);
-            if (! isIgnoreKind(kind)) {
+            if (! isResetIgnoreKind(kind)) {
                 buf.put(kind, 1);
             }
         }
@@ -199,6 +199,24 @@ public class QueryCacheStrategy extends RpcVisitor {
 	}
 
 	/**
+	 * 指定されたKindが予約済またはKindlessQueryまたは除外指定のKindかどうかを調べて返す。
+	 * @param kind 調べるKind
+	 * @return 処理対象外か否か
+	 * @author vvakame
+	 */
+	public static boolean isResetIgnoreKind(String kind) {
+		if (kind.startsWith("__")) {
+			return true;
+		} else if ("".equals(kind)) {
+			return true;
+		} else if (settings.getResetIgnoreKinds().contains(kind)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
 	 * ユーザが行うMemvacheの設定を読み取る。<br>
 	 * 主に、 {@link QueryCacheStrategy} に影響をおよぼす。
 	 * @author vvakame
@@ -212,6 +230,9 @@ public class QueryCacheStrategy extends RpcVisitor {
 
 		/** Queryをキャッシュ"しない"Kindの一覧 */
 		Set<String> ignoreKinds = new HashSet<String>();
+		
+		/** ResetDateを更新しないKindの一覧 */
+		Set<String> resetIgnoreKinds = new HashSet<String>();
 
 		static Settings singleton;
 
@@ -250,6 +271,16 @@ public class QueryCacheStrategy extends RpcVisitor {
 				}
 				ignoreKinds.add("_ah_SESSION");
 				ignoreKinds.add(CacheService.RESET_DATE_KIND);
+
+				String resetIgnoreKindStr = properties.getProperty("resetIgnoreKind");
+				if (resetIgnoreKindStr != null && !"".equals(resetIgnoreKindStr)) {
+					resetIgnoreKinds = new HashSet<String>(Arrays.asList(resetIgnoreKindStr.split(",")));
+				} else {
+					resetIgnoreKinds = new HashSet<String>();
+				}
+				resetIgnoreKinds.add("_ah_SESSION");
+				resetIgnoreKinds.add(CacheService.RESET_DATE_KIND);
+			
 			} catch (IOException e) {
 				logger.log(Level.SEVERE, "cannot load memvache.properties", e);
 			}
@@ -286,5 +317,14 @@ public class QueryCacheStrategy extends RpcVisitor {
 		public void setIgnoreKinds(Set<String> ignoreKinds) {
 			this.ignoreKinds = ignoreKinds;
 		}
+		
+		public Set<String> getResetIgnoreKinds() {
+			return resetIgnoreKinds;
+		}
+
+		public void setResetIgnoreKinds(Set<String> resetIgnoreKinds) {
+			this.resetIgnoreKinds = resetIgnoreKinds;
+		}
+		
 	}
 }
