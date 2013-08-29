@@ -27,6 +27,7 @@ import net.vvakame.memvache.MemcacheServiceWrapper;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.slim3.util.StringUtil;
 
 import com.google.appengine.api.NamespaceManager;
 import com.google.appengine.api.datastore.AsyncDatastoreService;
@@ -61,6 +62,7 @@ public class CacheService {
 	public static final String RESET_DATE_PROP = "resetDate";
 	public static final String KEY_RESET_DATE = "CacheResetDate:";
 	public static final String KEY_RUNQUERY = "RunQuery:";
+	public static final long MEMCACHE_DEFAULT_TIMEOUT = 3000L;
 	
 	// Local cache.
 	private Map<String, Object> localCache;
@@ -75,7 +77,12 @@ public class CacheService {
 	 */
 	public CacheService() {
 		//globalCache = MemcacheServiceFactory.getMemcacheService();
-		globalCache = new MemcacheServiceWrapper(3000L);
+		String memcacheTimeout = System.getProperty("memcache.timeout");
+		if (! StringUtil.isEmpty(memcacheTimeout)) {
+			globalCache = new MemcacheServiceWrapper(Long.parseLong(memcacheTimeout));
+		} else {
+			globalCache = new MemcacheServiceWrapper(MEMCACHE_DEFAULT_TIMEOUT);
+		}
         localCache = new HashMap<String, Object>();
         localCacheTime = System.currentTimeMillis();
 	}
