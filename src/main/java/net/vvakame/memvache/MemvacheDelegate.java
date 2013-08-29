@@ -8,6 +8,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+import org.slim3.util.StringUtil;
+
 import com.google.appengine.api.memcache.MemcacheService;
 import com.google.apphosting.api.ApiProxy;
 import com.google.apphosting.api.ApiProxy.ApiConfig;
@@ -224,7 +226,12 @@ public class MemvacheDelegate implements ApiProxy.Delegate<Environment> {
 	 */
 	public static MemcacheService getMemcache() {
 		//return MemcacheServiceFactory.getMemcacheService("memvache");
-		return new MemcacheServiceWrapper(RPC_TIMEOUT);
+		String memcacheTimeout = System.getProperty("memcache.timeout");
+		if (! StringUtil.isEmpty(memcacheTimeout)) {
+			return new MemcacheServiceWrapper(Long.parseLong(memcacheTimeout));
+		} else {
+			return new MemcacheServiceWrapper(RPC_TIMEOUT);
+		}
 	}
 
 	/**
