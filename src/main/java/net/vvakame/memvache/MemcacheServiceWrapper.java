@@ -3,10 +3,9 @@ package net.vvakame.memvache;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.appengine.api.memcache.AsyncMemcacheService;
@@ -226,14 +225,10 @@ public class MemcacheServiceWrapper implements MemcacheService {
         try {
             return millisec > 0L ? 
            		future.get(millisec, TimeUnit.MILLISECONDS) : future.get();
-        } catch (ExecutionException e) {
-        	logger.severe(e.getMessage());
-        } catch (InterruptedException e) {
-        	logger.severe(e.getMessage());
-        } catch (TimeoutException e) {
-			logger.severe(e.getMessage());
-		}
-        return null;
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "future getに失敗しました。", e);
+            return null;
+        }
     }
     
 }
