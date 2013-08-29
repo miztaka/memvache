@@ -18,3 +18,4 @@ www-test/
 pom.xml.releaseBackup
 release.properties
 
+/bin
