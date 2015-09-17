@@ -184,7 +184,7 @@ public class ResetDateStrategy extends RpcVisitor {
 					expireSecond = Integer.parseInt(expireSecondStr);
 				}
 
-				String ignoreKindStr = properties.getProperty("ignoreKind");
+				String ignoreKindStr = properties.getProperty("resetIgnoreKind");
 				if (ignoreKindStr != null && !"".equals(ignoreKindStr)) {
 					ignoreKinds = new HashSet<String>(Arrays.asList(ignoreKindStr.split(",")));
 				} else {

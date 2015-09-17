@@ -64,16 +64,10 @@ public class QueryCache implements Serializable {
 	 */
 	public byte[] getQuery(String kind, byte[] request) {
 		try {
-		    CacheItem item = null;
 		    String key = getQueryKey(request);
-			Object cachedData = getCache().get(key);
-			if (cachedData != null) {
-	            if (cachedData instanceof CacheItem) {
-	                item = (CacheItem)cachedData;
-	            } else {
-	                byte[] rawdata = getCache().getBlob(key);
-	                item = (CacheItem)StreamUtil.toObject(rawdata);
-	            }
+		    CacheItem item = getCache().getCacheItem(key);
+		    if (item != null) {
+		    	// timestampチェック
                 Date classResetDate = getClassResetDate(kind);
                 logger.debug("class reset date: " + classResetDate);
                 if (classResetDate == null
@@ -81,9 +75,8 @@ public class QueryCache implements Serializable {
                 	logger.info("STAT:" + kind + ",hit,1");
                     return getCachedQueryResult(item);
                 }
-			}
-		}
-		catch (Exception e) {
+		    }
+		} catch (Exception e) {
 			logger.error(ExceptionUtils.getStackTrace(e));
 		}
 		logger.info("STAT:" + kind + ",miss,1");
@@ -104,11 +97,7 @@ public class QueryCache implements Serializable {
         String key = getQueryKey(request);
         logger.debug("put query cache: " + kind + " " + key);
         CacheItem item = new CacheItem(response);
-        if (response.length > CacheService.CHUNK_SIZE) {
-            getCache().putBlob(key, StreamUtil.toBytes(item));
-        } else {
-            getCache().put(key, item);
-        }
+        getCache().put(key, item);
         return;
     }
 

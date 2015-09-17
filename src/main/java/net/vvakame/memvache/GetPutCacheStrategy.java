@@ -154,13 +154,25 @@ public class GetPutCacheStrategy extends RpcVisitor {
 
 		// Memcacheに蓄える
 		Map<Key, Entity> newMap = new HashMap<Key, Entity>();
-		List<Reference> keys = requestPb.keys();
+		//List<Reference> keys = requestPb.keys();
 		List<Entity> entitys = responsePb.entitys();
 
 		for (int i = 0; i < entitys.size(); i++) {
-			Key key = PbKeyUtil.toKey(keys.get(i));
+			//Key key = PbKeyUtil.toKey(keys.get(i));
 			Entity entity = entitys.get(i);
-			newMap.put(key, entity);
+			Key key = null;
+			try {
+				key = PbKeyUtil.toKey(entity.getEntity().getKey());
+			} catch(Exception e) {
+				try {
+					key = PbKeyUtil.toKey(entity.getKey());
+				} catch (Exception e2) {
+					logger.severe("Keyの取得に失敗しました。" + entity.toString());
+				}
+			}
+			if (key != null) {
+				newMap.put(key, entity);
+			}
 		}
 		MemcacheService memcache = MemvacheDelegate.getMemcache();
 		memcache.putAll(newMap);

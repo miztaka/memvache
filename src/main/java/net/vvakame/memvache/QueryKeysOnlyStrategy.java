@@ -1,6 +1,7 @@
 package net.vvakame.memvache;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -43,8 +44,10 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 	public Pair<byte[], byte[]> pre_datastore_v3_RunQuery(Query requestPb) {
 		
 		logger.fine("pre_datastore_v3_RunQuery start: " + Thread.currentThread().getId() + " " + this);
+		logger.fine("kind: " + requestPb.getKind());
 		
 		if (requestPb.isKeysOnly()) {
+			logger.fine("this query is originally KeysOnly. nothing to do.");
 			return null;
 		}
 		if (requestPb.getKind().startsWith("__")) {
@@ -76,9 +79,11 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 		// Nextのためにカーソルを覚えておく
 		if (responsePb.isMoreResults()) {
 			rewritedCursor.add(responsePb.getCursor());
+			logger.fine("list up cursor: " + responsePb.getCursor());
 		}
 
 		reconstructQueryResult(responsePb);
+		logger.fine("Query Result reconstructed using cache.");
 
 		// TODO compiledQuery, compiledCursor, cursor, index, indexOnly …etcについてKeysOnlyにしたことで挙動が変わるかを調査しないとアカン。
 		// TODO RunCompiledQuery, Next のmethodについても調査が必要かなぁ…
@@ -98,8 +103,10 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 	public byte[] post_datastore_v3_Next(NextRequest requestPb, QueryResult responsePb) {
 		
 		logger.fine("post_datastore_v3_Next start: " + Thread.currentThread().getId() + " " + this);
+		logger.fine("cursor: " + requestPb.getCursor());
 
 		if (rewritedCursor == null || !rewritedCursor.contains(requestPb.getCursor())) {
+			logger.fine("no rewrited cursor found.");
 			return null;
 		}
 		logger.fine("Next: rewrited cursor.");
@@ -127,7 +134,7 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 			}
 
 			keys = PbKeyUtil.toKeys(requestedKeys);
-			logger.fine("key count: " + keys.size());
+			logger.info("key count: " + keys.size());
 		}
 		
 		/*
@@ -153,6 +160,10 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 		Map<Key, DatastorePb.GetResponse.Entity> cached;
 		{
 			Map<Key, Object> all = MemvacheDelegate.getMemcache().getAll(keys);
+			if (all == null) {
+				logger.severe("memcache#getAll returns null. continue.");
+				all = new LinkedHashMap<Key,Object>();
+			}
 			cached = MemcacheKeyUtil.conv(all);
 			logger.info("STAT:BatchGetKeysOnly,hit," + cached.size());
 		}
@@ -175,7 +186,7 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 		// 1つの検索結果であるかのように組み立てる
 		responsePb.setKeysOnly(false);
 		responsePb.clearResult();
-
+		
 		for (Key key : keys) {
 			Entity entityByGet = (batchGet == null) ? null : batchGet.get(key);
 			if (entityByGet != null) {
@@ -185,6 +196,8 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
 				DatastorePb.GetResponse.Entity entity = cached.get(key);
 				if (entity != null) {
 					responsePb.addResult(entity.getEntity());
+				} else {
+					logger.severe("Missing entity: " + key);
 				}
 			}
 		}

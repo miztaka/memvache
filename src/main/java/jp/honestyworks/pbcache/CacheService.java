@@ -56,14 +56,17 @@ public class CacheService {
 	private static final Log logger = LogFactory.getLog(CacheService.class);
 
 	private static final long LOCAL_CACHE_TTL = 5000;
+    private static final String CHUNK_PREFIX = "%CHUNK%"; 
 
 	public static final int CHUNK_SIZE = 1000000;
+	public static int CACHE_SIZE_LIMIT = 1000000;
+
 	public static final String RESET_DATE_KIND = "CacheReset";
 	public static final String RESET_DATE_PROP = "resetDate";
 	public static final String KEY_RESET_DATE = "CacheResetDate:";
 	public static final String KEY_RUNQUERY = "RunQuery:";
 	public static final long MEMCACHE_DEFAULT_TIMEOUT = 3000L;
-	
+
 	// Local cache.
 	private Map<String, Object> localCache;
 	private long localCacheTime;
@@ -227,17 +230,24 @@ public class CacheService {
 			}
 			Object value = globalCache.get(key);
 			if (value != null) {
-				logger.debug("hit public cache: " + key);
+				if (value instanceof String && ((String)value).startsWith(CHUNK_PREFIX)) {
+					// get chunk
+					value = getChunk((String)value);
+					if (value == null) {
+						logger.debug("cache chunk miss: " + key);
+						return null;
+					}
+				}
 				if (localCacheUsed) {
 				    localCache.put((String)key, value);
 				}
 				cacheHits++;
+				logger.debug("hit public cache: " + key);
 				return value;
 			}
 			logger.debug("cache miss: " + key);
 			return null;
-		}
-		catch (InvalidValueException e) {
+		} catch (InvalidValueException e) {
 			logger.error(e);
 			return null;
 		}
@@ -257,7 +267,7 @@ public class CacheService {
 	        localCache.put(localKey, value);
 	    }
 		try {
-			globalCache.put(key, value);
+			putChunk(key, value);
 			return value;
 		}
 		catch (Exception e) {
@@ -319,42 +329,74 @@ public class CacheService {
 	 * @param key
 	 * @return
 	 */
-	public byte[] getBlob(String key) {
-		String chunkList = (String)get(key);
+	private Object getChunk(String chunkKey) {
+		
+		String[] chunkList = null;
+		String valueType = "B";
+		if (chunkKey.startsWith(CHUNK_PREFIX)) {
+			String buff = chunkKey.substring(CHUNK_PREFIX.length()+2);
+			chunkList = buff.split(",");
+			valueType = chunkKey.substring(CHUNK_PREFIX.length(), CHUNK_PREFIX.length()+1);
+		} else {
+			chunkList = chunkKey.split(",");
+			valueType = "B";
+		}
+		logger.debug("getChunk: " + valueType + " " + chunkList);
+		
 		if (chunkList != null) {
 			List<byte[]> data = new ArrayList<byte[]>();
-			int size = 0;
-			for (String chunkKey : chunkList.split(",")) {
-				byte[] chunk = (byte[])get(chunkKey);
+			for (String oneKey : chunkList) {
+				byte[] chunk = (byte[])globalCache.get(oneKey);
 				if (chunk == null) {
 					return null;
 				}
 				data.add(chunk);
-				size += chunk.length;
 			}
-			return ChunkUtil.packChunks(data);
+			if (! data.isEmpty()) {
+				byte[] rawdata = ChunkUtil.packChunks(data);
+				return "O".equals(valueType) ? StreamUtil.toObject(rawdata) : rawdata;
+			}
 		}
 		return null;
 	}
-
-	public static int CACHE_SIZE_LIMIT = 1000000;
 
 	/**
 	 * Put large cached data. 
 	 * @param key
 	 * @param data
 	 */
-	public void putBlob(String key, byte[] data) {
+	private void putChunk(Object key, Object data) {
+		
+		byte[] rawdata = null;
+		String prefix = CHUNK_PREFIX;
+		if (data instanceof byte[]) {
+			rawdata = (byte[]) data;
+			prefix += "B%";
+		} else {
+			rawdata = StreamUtil.toBytes(data);
+			prefix += "O%";
+		}
+		if (rawdata.length < CACHE_SIZE_LIMIT) {
+			// chunk必要なし
+			globalCache.put(key, data);
+			return;
+		}
+		
+		// chunk作成
 		List<String> chunkList = new ArrayList<String>();
-		List<byte[]> chunks = ChunkUtil.makeChunks(data, CACHE_SIZE_LIMIT);
+		List<byte[]> chunks = ChunkUtil.makeChunks(rawdata, CACHE_SIZE_LIMIT);
 		int i = 0;
+		Map<Object,Object> cacheData = new HashMap<Object,Object>();
 		for (byte[] chunk : chunks) {
-			String chunkKey = key + String.valueOf(i);
-			put(chunkKey, chunk);
+			String chunkKey = "chunk:" + String.valueOf(i) + ":" + key;
+			cacheData.put(chunkKey, chunk);
 			chunkList.add(chunkKey);
 			i++;
 		}
-		put(key, StringUtils.join(chunkList, ","));
+		cacheData.put(key, prefix + StringUtils.join(chunkList, ","));
+		globalCache.putAll(cacheData);
+		
+		return;
 	}
 
 	protected String localKey(String key) {
@@ -382,17 +424,24 @@ public class CacheService {
      */
     public CacheItem getCacheItem(String key) {
     	
+    	CacheItem item = (CacheItem)get(key);
+    	return item;
+    	
+    	/*
 		Object cachedData = get(key);
 		if (cachedData != null) {
             if (cachedData instanceof CacheItem) {
                 return (CacheItem)cachedData;
             } else {
                 byte[] rawdata = getBlob(key);
-                CacheItem item = (CacheItem)StreamUtil.toObject(rawdata);
-                return item;
+                if (rawdata != null) {
+                	CacheItem item = (CacheItem)StreamUtil.toObject(rawdata);
+                	return item;
+                }
             }
 		}
     	return null;
+    	*/
     }
 
 }

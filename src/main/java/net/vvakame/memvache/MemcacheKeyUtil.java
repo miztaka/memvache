@@ -2,6 +2,7 @@ package net.vvakame.memvache;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.memcache.MemcacheService;
@@ -9,6 +10,8 @@ import com.google.apphosting.api.DatastorePb.GetResponse.Entity;
 import com.google.apphosting.api.DatastorePb.Query;
 
 class MemcacheKeyUtil {
+	
+	static final Logger logger = Logger.getLogger(MemcacheKeyUtil.class.getName());
 
 	public static String createKindKey(StringBuilder builder, String namespace, String kind) {
 		builder.append(namespace).append("@");
@@ -46,7 +49,21 @@ class MemcacheKeyUtil {
 	public static Map<Key, Entity> conv(Map<Key, Object> map) {
 		Map<Key, Entity> newMap = new HashMap<Key, Entity>();
 		for (Key key : map.keySet()) {
-			newMap.put(key, (Entity) map.get(key));
+			Entity e = (Entity) map.get(key);
+			boolean valid = true;
+			if (e == null) {
+				logger.severe("cached entity is null. " + key);
+				valid = false; 
+			} else if (e.getMutableEntity() == null) {
+				logger.severe("cached entity#getMutableEntity() is null. " + key);
+				valid = false;
+			} else if (e.getMutableEntity().propertySize() == 0) {
+				logger.severe("cached entity propertySize is zero." + key);
+				valid = false;
+			}
+			if (valid) {
+				newMap.put(key, e);
+			}
 		}
 
 		return newMap;
