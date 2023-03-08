@@ -27,7 +27,6 @@ import net.vvakame.memvache.MemcacheServiceWrapper;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.slim3.util.StringUtil;
 
 import com.google.appengine.api.NamespaceManager;
 import com.google.appengine.api.datastore.AsyncDatastoreService;
@@ -81,7 +80,7 @@ public class CacheService {
 	public CacheService() {
 		//globalCache = MemcacheServiceFactory.getMemcacheService();
 		String memcacheTimeout = System.getProperty("memcache.timeout");
-		if (! StringUtil.isEmpty(memcacheTimeout)) {
+		if (! StringUtils.isEmpty(memcacheTimeout)) {
 			globalCache = new MemcacheServiceWrapper(Long.parseLong(memcacheTimeout));
 		} else {
 			globalCache = new MemcacheServiceWrapper(MEMCACHE_DEFAULT_TIMEOUT);
