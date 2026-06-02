@@ -146,6 +146,41 @@ public class QueryKeysOnlyStrategyTest extends ControllerTestCase {
    * @author vvakame
    */
   @Test
+  public void queryKeysOnly_populatesEntityCacheWithPutCacheStrategy() {
+    {
+      Entity entity = new Entity("hoge", 1);
+      entity.setProperty("v1", 1);
+      Datastore.put(entity);
+    }
+    {
+      Entity entity = new Entity("hoge", 2);
+      entity.setProperty("v2", 2);
+      Datastore.put(entity);
+    }
+
+    MemvacheDelegate.getMemcache().clearAll();
+
+    Map<String, Integer> countMap = countDelegate.countMap;
+    countMap.clear();
+
+    List<Entity> entities = Datastore.query("hoge").asEntityList();
+    assertThat(entities.size(), is(2));
+    assertThat("初回はDatastoreから補填", countMap.get("datastore_v3@Get"), is(1));
+    assertThat(MemvacheDelegate.getMemcache().get(Datastore.createKey("hoge", 1)), notNullValue());
+    assertThat(MemvacheDelegate.getMemcache().get(Datastore.createKey("hoge", 2)), notNullValue());
+
+    countMap.clear();
+
+    entities = Datastore.query("hoge").asEntityList();
+    assertThat(entities.size(), is(2));
+    assertThat("2回目はPutCacheStrategyが作ったキャッシュから補填", countMap.get("datastore_v3@Get"), is(0));
+  }
+
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
   public void queryKeysOnly() {
     {
       Entity entity = new Entity("hoge", 1);
@@ -210,7 +245,7 @@ public class QueryKeysOnlyStrategyTest extends ControllerTestCase {
         MemvacheDelegate.install(
             StrategyBuilder.newBuilder()
                 .addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
-                .addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
+                .addStrategy(MemvacheDelegate.DATASTORE_V3, PutCacheStrategy.class)
                 .buid());
 
     {
@@ -294,7 +329,7 @@ public class QueryKeysOnlyStrategyTest extends ControllerTestCase {
         MemvacheDelegate.install(
             StrategyBuilder.newBuilder()
                 .addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
-                .addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
+                .addStrategy(MemvacheDelegate.DATASTORE_V3, PutCacheStrategy.class)
                 .buid());
     // memvacheDelegate.strategies.get().clear();
     // memvacheDelegate.strategies.get().add(new QueryKeysOnlyStrategy());
