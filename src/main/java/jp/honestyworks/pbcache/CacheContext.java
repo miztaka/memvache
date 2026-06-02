@@ -21,35 +21,35 @@ package jp.honestyworks.pbcache;
  *
  */
 public class CacheContext {
-	
-	private CacheService cacheService;
-	private QueryCache queryCache;
-	
-	private CacheContext() {
-		cacheService = new CacheService();
-		queryCache = new QueryCache();
-	}
-	
-	private static ThreadLocal<CacheContext> threadInstance;
-	 
-	public static CacheContext getInstance() {
-		if (threadInstance == null) {
-			threadInstance = new ThreadLocal<CacheContext>() {
-				@Override
-				protected CacheContext initialValue() {
-					return new CacheContext();
-				}
-			};
-		}
-		return threadInstance.get();
-	}
 
-	public CacheService getCacheService() {
-		return cacheService;
-	}
+  private CacheService cacheService;
+  private QueryCache queryCache;
 
-	public QueryCache getQueryCache() {
-		return queryCache;
-	}
+  private CacheContext() {
+    cacheService = new CacheService();
+    queryCache = new QueryCache();
+  }
 
+  private static ThreadLocal<CacheContext> threadInstance;
+
+  public static CacheContext getInstance() {
+    if (threadInstance == null) {
+      threadInstance =
+          new ThreadLocal<CacheContext>() {
+            @Override
+            protected CacheContext initialValue() {
+              return new CacheContext();
+            }
+          };
+    }
+    return threadInstance.get();
+  }
+
+  public CacheService getCacheService() {
+    return cacheService;
+  }
+
+  public QueryCache getQueryCache() {
+    return queryCache;
+  }
 }

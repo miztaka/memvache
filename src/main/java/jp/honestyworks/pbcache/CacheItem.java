@@ -19,28 +19,27 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 
+ *
  * @author miztaka
  *
  */
 @SuppressWarnings("serial")
 public class CacheItem implements Serializable {
 
-	private Object data;
-	private Date timestamp;
-	
-	public Object getData() {
-		return data;
-	}
+  private Object data;
+  private Date timestamp;
 
-	public Date getTimestamp() {
-		return timestamp;
-	}
+  public Object getData() {
+    return data;
+  }
 
-	public CacheItem(Object data) {
-		super();
-		this.data = data;
-		this.timestamp = new Date();
-	}
+  public Date getTimestamp() {
+    return timestamp;
+  }
 
+  public CacheItem(Object data) {
+    super();
+    this.data = data;
+    this.timestamp = new Date();
+  }
 }

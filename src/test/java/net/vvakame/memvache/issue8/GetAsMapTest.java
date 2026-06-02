@@ -1,24 +1,20 @@
 package net.vvakame.memvache.issue8;
 
+import static org.hamcrest.CoreMatchers.*;
+import static org.junit.Assert.*;
+
+import com.google.appengine.api.datastore.Entity;
+import com.google.appengine.api.datastore.Key;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
 import net.vvakame.memvache.GetPutCacheStrategy;
 import net.vvakame.memvache.MemvacheDelegate;
 import net.vvakame.memvache.QueryKeysOnlyStrategy;
 import net.vvakame.memvache.StrategyBuilder;
-
 import org.junit.Test;
 import org.slim3.datastore.Datastore;
 import org.slim3.tester.ControllerTestCase;
-
-import com.google.appengine.api.datastore.Entity;
-import com.google.appengine.api.datastore.Key;
-
-import static org.hamcrest.CoreMatchers.*;
-
-import static org.junit.Assert.*;
 
 /**
  * Issue 8 再現用のテスト。
@@ -26,55 +22,54 @@ import static org.junit.Assert.*;
  */
 public class GetAsMapTest extends ControllerTestCase {
 
-	MemvacheDelegate memvacheDelegate;
+  MemvacheDelegate memvacheDelegate;
 
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
+  public void test() {
+    List<Key> keyList = new ArrayList<Key>();
+    List<Entity> entityList = new ArrayList<Entity>();
+    for (int i = 1; i <= 100; i++) {
+      Key key = Datastore.createKey("hoge", i);
+      keyList.add(key);
+      if (i % 2 == 0) {
+        // entity doesn't have any property.
+        Entity entity = new Entity(key);
+        entityList.add(entity);
+      }
+    }
+    Datastore.put(entityList);
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 */
-	@Test
-	public void test() {
-		List<Key> keyList = new ArrayList<Key>();
-		List<Entity> entityList = new ArrayList<Entity>();
-		for (int i = 1; i <= 100; i++) {
-			Key key = Datastore.createKey("hoge", i);
-			keyList.add(key);
-			if (i % 2 == 0) {
-				// entity doesn't have any property.
-				Entity entity = new Entity(key);
-				entityList.add(entity);
-			}
-		}
-		Datastore.put(entityList);
+    Map<Key, Entity> map = Datastore.getAsMap(keyList);
+    assertThat(map.size(), is(50));
 
-		Map<Key, Entity> map = Datastore.getAsMap(keyList);
-		assertThat(map.size(), is(50));
+    for (Key key : keyList) {
+      if (key.getId() % 2 == 0) {
+        Entity entity = map.get(key);
+        assertThat(entity.getKey(), is(key));
+      }
+    }
+  }
 
-		for (Key key : keyList) {
-			if (key.getId() % 2 == 0) {
-				Entity entity = map.get(key);
-				assertThat(entity.getKey(), is(key));
-			}
-		}
-	}
+  @Override
+  public void setUp() throws Exception {
+    super.setUp();
 
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
+    memvacheDelegate =
+        MemvacheDelegate.install(
+            StrategyBuilder.newBuilder()
+                .addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
+                .addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
+                .buid());
+  }
 
-		memvacheDelegate = MemvacheDelegate.install(
-				StrategyBuilder.newBuilder()
-				.addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
-				.addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
-				.buid()
-				);
-	}
+  @Override
+  public void tearDown() throws Exception {
+    memvacheDelegate.uninstall();
 
-	@Override
-	public void tearDown() throws Exception {
-		memvacheDelegate.uninstall();
-
-		super.tearDown();
-	}
+    super.tearDown();
+  }
 }

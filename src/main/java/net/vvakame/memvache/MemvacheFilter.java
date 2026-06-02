@@ -2,7 +2,6 @@ package net.vvakame.memvache;
 
 import java.io.IOException;
 import java.util.logging.Logger;
-
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -16,48 +15,44 @@ import javax.servlet.ServletResponse;
  */
 public class MemvacheFilter implements Filter {
 
-	static final Logger logger = Logger.getLogger(MemvacheFilter.class.getSimpleName());
-	
-	MemvacheDelegate delegate;
+  static final Logger logger = Logger.getLogger(MemvacheFilter.class.getSimpleName());
 
-	@Override
-	public void init(FilterConfig filterConfig) {
-		
-		RpcVisitor.debug = false;
-		delegate = MemvacheDelegate.install(
-			StrategyBuilder.newBuilder()
-				.addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
-				.addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
-				.buid()
-		);
-	}
+  MemvacheDelegate delegate;
 
-	@Override
-	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-			throws IOException, ServletException {
-		
-		// ストラテジーの初期化
-		delegate.initStrategies();
-		
-		chain.doFilter(request, response);
-		
-	}
+  @Override
+  public void init(FilterConfig filterConfig) {
 
-	protected void preProcess(MemvacheDelegate delegate) {
-	}
+    RpcVisitor.debug = false;
+    delegate =
+        MemvacheDelegate.install(
+            StrategyBuilder.newBuilder()
+                .addStrategy(MemvacheDelegate.DATASTORE_V3, QueryKeysOnlyStrategy.class)
+                .addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
+                .buid());
+  }
 
-	void doThrow(Throwable th) throws IOException, ServletException {
-		if (th instanceof ServletException) {
-			throw (ServletException) th;
-		}
-		if (th instanceof IOException) {
-			throw (IOException) th;
-		}
-		throw new ServletException(th);
-	}
+  @Override
+  public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+      throws IOException, ServletException {
 
-	@Override
-	public void destroy() {
-	}
-	
+    // ストラテジーの初期化
+    delegate.initStrategies();
+
+    chain.doFilter(request, response);
+  }
+
+  protected void preProcess(MemvacheDelegate delegate) {}
+
+  void doThrow(Throwable th) throws IOException, ServletException {
+    if (th instanceof ServletException) {
+      throw (ServletException) th;
+    }
+    if (th instanceof IOException) {
+      throw (IOException) th;
+    }
+    throw new ServletException(th);
+  }
+
+  @Override
+  public void destroy() {}
 }

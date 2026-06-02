@@ -17,7 +17,6 @@ package jp.honestyworks.pbcache;
 
 import java.io.Serializable;
 import java.util.Date;
-
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
@@ -25,84 +24,80 @@ import org.apache.commons.logging.LogFactory;
 
 /**
  * Datastore RunQuery cache.
- * 
+ *
  * @author miztaka
  *
  */
 @SuppressWarnings("serial")
 public class QueryCache implements Serializable {
 
-	protected static final Log logger = LogFactory.getLog(
-			QueryCache.class);
+  protected static final Log logger = LogFactory.getLog(QueryCache.class);
 
-	public QueryCache() {
-	}
+  public QueryCache() {}
 
-	private CacheService getCache() {
-		return CacheContext.getInstance().getCacheService();
-	}
+  private CacheService getCache() {
+    return CacheContext.getInstance().getCacheService();
+  }
 
-	private String getQueryKey(byte[] request) {
-	    String b64request = Base64.encodeBase64String(request);
-	    return CacheService.KEY_RUNQUERY + b64request;
-	}
+  private String getQueryKey(byte[] request) {
+    String b64request = Base64.encodeBase64String(request);
+    return CacheService.KEY_RUNQUERY + b64request;
+  }
 
-	private String getClassResetdateKey(String kind) {
-		return CacheService.KEY_RUNQUERY + kind;
-	}
-	
-	private Date getClassResetDate(String  kind) {
-		return getCache().getResetDate(getClassResetdateKey(kind));
-	}
-	
-	/**
-	 * Get query cache.
-	 * 
-	 * @param kind
-	 * @param request
-	 * @return
-	 */
-	public byte[] getQuery(String kind, byte[] request) {
-		try {
-		    String key = getQueryKey(request);
-		    CacheItem item = getCache().getCacheItem(key);
-		    if (item != null) {
-		    	// timestampチェック
-                Date classResetDate = getClassResetDate(kind);
-                logger.debug("class reset date: " + classResetDate);
-                if (classResetDate == null
-                        || item.getTimestamp().after(classResetDate)) {
-                	logger.info("STAT:" + kind + ",hit,1");
-                    return getCachedQueryResult(item);
-                }
-		    }
-		} catch (Exception e) {
-			logger.error(ExceptionUtils.getStackTrace(e));
-		}
-		logger.info("STAT:" + kind + ",miss,1");
-		return null;
-	}
+  private String getClassResetdateKey(String kind) {
+    return CacheService.KEY_RUNQUERY + kind;
+  }
 
-	private byte[] getCachedQueryResult(CacheItem item) {
-		return (byte[])item.getData();
-	}
-	
-	/**
-	 * Put query result to cache.
-	 * @param kind
-	 * @param request
-	 * @param response
-	 */
-    public void putQuery(String kind, byte[] request, byte[] response) {
-        String key = getQueryKey(request);
-        logger.debug("put query cache: " + kind + " " + key);
-        CacheItem item = new CacheItem(response);
-        getCache().put(key, item);
-        return;
+  private Date getClassResetDate(String kind) {
+    return getCache().getResetDate(getClassResetdateKey(kind));
+  }
+
+  /**
+   * Get query cache.
+   *
+   * @param kind
+   * @param request
+   * @return
+   */
+  public byte[] getQuery(String kind, byte[] request) {
+    try {
+      String key = getQueryKey(request);
+      CacheItem item = getCache().getCacheItem(key);
+      if (item != null) {
+        // timestampチェック
+        Date classResetDate = getClassResetDate(kind);
+        logger.debug("class reset date: " + classResetDate);
+        if (classResetDate == null || item.getTimestamp().after(classResetDate)) {
+          logger.info("STAT:" + kind + ",hit,1");
+          return getCachedQueryResult(item);
+        }
+      }
+    } catch (Exception e) {
+      logger.error(ExceptionUtils.getStackTrace(e));
     }
+    logger.info("STAT:" + kind + ",miss,1");
+    return null;
+  }
 
-	public void removeQueries(String kind) {
-		getCache().putResetDate(getClassResetdateKey(kind));
-	}
+  private byte[] getCachedQueryResult(CacheItem item) {
+    return (byte[]) item.getData();
+  }
 
+  /**
+   * Put query result to cache.
+   * @param kind
+   * @param request
+   * @param response
+   */
+  public void putQuery(String kind, byte[] request, byte[] response) {
+    String key = getQueryKey(request);
+    logger.debug("put query cache: " + kind + " " + key);
+    CacheItem item = new CacheItem(response);
+    getCache().put(key, item);
+    return;
+  }
+
+  public void removeQueries(String kind) {
+    getCache().putResetDate(getClassResetdateKey(kind));
+  }
 }

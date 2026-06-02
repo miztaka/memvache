@@ -1,24 +1,23 @@
 package net.vvakame.memvache;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyTranslatorPublic;
 import com.google.storage.onestore.v3.OnestoreEntity.Reference;
+import java.util.ArrayList;
+import java.util.List;
 
 class PbKeyUtil {
 
-	public static List<Key> toKeys(List<Reference> keys) {
-		List<Key> rowKeys = new ArrayList<Key>();
-		for (Reference reference : keys) {
-			rowKeys.add(toKey(reference));
-		}
+  public static List<Key> toKeys(List<Reference> keys) {
+    List<Key> rowKeys = new ArrayList<Key>();
+    for (Reference reference : keys) {
+      rowKeys.add(toKey(reference));
+    }
 
-		return rowKeys;
-	}
+    return rowKeys;
+  }
 
-	public static Key toKey(Reference reference) {
-		return KeyTranslatorPublic.createFromPb(reference);
-	}
+  public static Key toKey(Reference reference) {
+    return KeyTranslatorPublic.createFromPb(reference);
+  }
 }

@@ -1,11 +1,7 @@
 package net.vvakame.memvache;
 
-import java.util.Map;
-
-import org.junit.Test;
-import org.slim3.datastore.Datastore;
-import org.slim3.memcache.Memcache;
-import org.slim3.tester.ControllerTestCase;
+import static org.hamcrest.CoreMatchers.*;
+import static org.junit.Assert.*;
 
 import com.google.appengine.api.datastore.DatastoreService;
 import com.google.appengine.api.datastore.DatastoreServiceFactory;
@@ -17,10 +13,11 @@ import com.google.appengine.api.datastore.Transaction;
 import com.google.appengine.api.memcache.MemcacheService;
 import com.google.apphosting.api.DatastorePb;
 import com.google.storage.onestore.v3.OnestoreEntity.EntityProto;
-
-import static org.hamcrest.CoreMatchers.*;
-
-import static org.junit.Assert.*;
+import java.util.Map;
+import org.junit.Test;
+import org.slim3.datastore.Datastore;
+import org.slim3.memcache.Memcache;
+import org.slim3.tester.ControllerTestCase;
 
 /**
  * {@link GetPutCacheStrategy} のテストケース。
@@ -28,191 +25,197 @@ import static org.junit.Assert.*;
  */
 public class GetPutCacheStrategyTest extends ControllerTestCase {
 
-	MemvacheDelegate memvacheDelegate;
+  MemvacheDelegate memvacheDelegate;
 
-	RpcCounterDelegate countDelegate;
+  RpcCounterDelegate countDelegate;
 
+  /**
+   * テストケース。
+   * @author vvakame
+   * @throws EntityNotFoundException
+   */
+  @Test
+  public void put_notAllocatedId() throws EntityNotFoundException {
+    DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
+    Entity entity = new Entity("hoge");
+    Key key = datastore.put(entity);
+    datastore.get(key);
+  }
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 * @throws EntityNotFoundException 
-	 */
-	@Test
-	public void put_notAllocatedId() throws EntityNotFoundException {
-		DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
-		Entity entity = new Entity("hoge");
-		datastore.put(entity);
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
+  public void put_withTx_withCommit() {
+    Key key = Datastore.createKey("hoge", 1);
+    Transaction tx = Datastore.beginTransaction();
+    Datastore.put(new Entity(key));
 
-		Key key = entity.getKey();
-		datastore.get(key);
-	}
+    assertThat("Tx下なので0", Memcache.statistics().getItemCount(), is(0L));
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 */
-	@Test
-	public void put_withTx_withCommit() {
-		Transaction tx = Datastore.beginTransaction();
-		Datastore.put(new Entity("hoge", 1));
+    tx.commit();
 
-		assertThat("Tx下なので0", Memcache.statistics().getItemCount(), is(0L));
+    assertThat("1つput", MemvacheDelegate.getMemcache().get(key), notNullValue());
+  }
 
-		tx.commit();
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
+  public void put_with2Tx_withCommit() {
+    Key key1 = Datastore.createKey("hoge", 1);
+    Transaction tx1 = Datastore.beginTransaction();
+    Datastore.put(new Entity(key1));
 
-		assertThat("1つput", Memcache.statistics().getItemCount(), is(1L));
-	}
+    assertThat("Tx下なので0", Memcache.statistics().getItemCount(), is(0L));
+    tx1.commit();
+    assertThat("1つ目put", MemvacheDelegate.getMemcache().get(key1), notNullValue());
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 */
-	@Test
-	public void put_with2Tx_withCommit() {
-		Transaction tx1 = Datastore.beginTransaction();
-		Datastore.put(new Entity("hoge", 1));
+    Key key2 = Datastore.createKey("hoge", 2);
+    Transaction tx2 = Datastore.beginTransaction();
+    Datastore.put(new Entity(key2));
 
-		Transaction tx2 = Datastore.beginTransaction();
-		Datastore.put(new Entity("hoge", 2));
+    tx2.commit();
+    assertThat("2つ目put", MemvacheDelegate.getMemcache().get(key2), notNullValue());
+  }
 
-		assertThat("Tx下なので0", Memcache.statistics().getItemCount(), is(0L));
-		tx2.commit();
-		assertThat("1つ目put", Memcache.statistics().getItemCount(), is(1L));
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
+  public void put_withTx_withRollback() {
+    Transaction tx = Datastore.beginTransaction();
+    Datastore.put(new Entity("hoge", 1));
 
-		tx1.commit();
-		assertThat("2つ目put", Memcache.statistics().getItemCount(), is(2L));
-	}
+    assertThat("Tx下なので0", Memcache.statistics().getItemCount(), is(0L));
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 */
-	@Test
-	public void put_withTx_withRollback() {
-		Transaction tx = Datastore.beginTransaction();
-		Datastore.put(new Entity("hoge", 1));
+    tx.rollback();
 
-		assertThat("Tx下なので0", Memcache.statistics().getItemCount(), is(0L));
+    assertThat("なかったことに", Memcache.statistics().getItemCount(), is(0L));
+  }
 
-		tx.rollback();
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
+  public void get_existsAllCache() {
+    Key key;
+    {
+      Entity entity = new Entity("hoge", 1);
+      entity.setProperty("v1", 1);
+      MemcacheService memcache = MemvacheDelegate.getMemcache();
+      key = entity.getKey();
+      EntityProto proto = EntityTranslatorPublic.convertToPb(entity);
+      DatastorePb.GetResponse.Entity en = new DatastorePb.GetResponse.Entity();
+      en.setEntity(proto);
+      en.setKey(proto.getKey());
+      memcache.put(key, en);
+    }
 
-		assertThat("なかったことに", Memcache.statistics().getItemCount(), is(0L));
-	}
+    Map<String, Integer> countMap = countDelegate.countMap;
+    countMap.clear();
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 */
-	@Test
-	public void get_existsAllCache() {
-		Key key;
-		{
-			Entity entity = new Entity("hoge", 1);
-			entity.setProperty("v1", 1);
-			MemcacheService memcache = MemvacheDelegate.getMemcache();
-			key = entity.getKey();
-			EntityProto proto = EntityTranslatorPublic.convertToPb(entity);
-			DatastorePb.GetResponse.Entity en = new DatastorePb.GetResponse.Entity();
-			en.setEntity(proto);
-			memcache.put(key, en);
-		}
+    Datastore.get(key);
 
-		Map<String, Integer> countMap = countDelegate.countMap;
-		countMap.clear();
+    assertThat("あった", countMap.get("memcache@Get"), is(1));
+    assertThat("あった", countMap.get("datastore_v3@Get"), is(0));
+    assertThat("GetしてないのでSetなし", countMap.get("memcache@Set"), is(0));
+  }
 
-		Datastore.get(key);
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
+  public void get_existsDefectCache() {
+    Key key1;
+    {
+      Entity entity = new Entity("hoge", 1);
+      entity.setProperty("v1", 1);
+      MemcacheService memcache = MemvacheDelegate.getMemcache();
+      key1 = entity.getKey();
+      EntityProto entityProto = EntityTranslatorPublic.convertToPb(entity);
+      com.google.apphosting.api.DatastorePb.GetResponse.Entity en =
+          new DatastorePb.GetResponse.Entity();
+      en.setEntity(entityProto);
+      memcache.put(key1, en);
+    }
 
-		assertThat("あった", countMap.get("memcache@Get"), is(1));
-		assertThat("あった", countMap.get("datastore_v3@Get"), is(0));
-		assertThat("GetしてないのでSetなし", countMap.get("memcache@Set"), is(0));
-	}
+    Key key2;
+    {
+      Entity entity = new Entity("hoge", 2);
+      entity.setProperty("v1", 1);
+      key2 = entity.getKey();
+      Datastore.put(entity);
+      MemvacheDelegate.getMemcache().delete(key2);
+    }
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 */
-	@Test
-	public void get_existsDefectCache() {
-		Key key1;
-		{
-			Entity entity = new Entity("hoge", 1);
-			entity.setProperty("v1", 1);
-			MemcacheService memcache = MemvacheDelegate.getMemcache();
-			key1 = entity.getKey();
-			EntityProto entityProto = EntityTranslatorPublic.convertToPb(entity);
-			com.google.apphosting.api.DatastorePb.GetResponse.Entity en =
-					new DatastorePb.GetResponse.Entity();
-			en.setEntity(entityProto);
-			memcache.put(key1, en);
-		}
+    Map<String, Integer> countMap = countDelegate.countMap;
+    countMap.clear();
 
-		Key key2;
-		{
-			Entity entity = new Entity("hoge", 1);
-			entity.setProperty("v1", 1);
-			key2 = entity.getKey();
-			Datastore.put(entity);
-		}
+    Datastore.get(key1, key2);
 
-		Map<String, Integer> countMap = countDelegate.countMap;
-		countMap.clear();
+    assertThat("あった", countMap.get("memcache@Get"), is(1));
+    assertThat("1つない", countMap.get("datastore_v3@Get"), is(1));
+    assertThat("1つ新規", countMap.get("memcache@Set"), is(1));
+  }
 
-		Datastore.get(key1, key2);
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
+  public void delete() {
+    Entity entity = new Entity("hoge", 1);
+    Key key = Datastore.put(entity);
+    MemvacheDelegate.getMemcache().put(key, entity);
 
-		assertThat("あった", countMap.get("memcache@Get"), is(1));
-		assertThat("1つない", countMap.get("datastore_v3@Get"), is(1));
-		assertThat("1つ新規", countMap.get("memcache@Set"), is(1));
-	}
+    assertThat(Memcache.statistics().getItemCount(), is(1L));
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 */
-	@Test
-	public void delete() {
-		Entity entity = new Entity("hoge", 1);
-		Datastore.put(entity);
+    Datastore.delete(key);
 
-		assertThat(Memcache.statistics().getItemCount(), is(1L));
+    assertThat(Memcache.statistics().getItemCount(), is(0L));
+  }
 
-		Datastore.delete(entity.getKey());
+  /**
+   * テストケース。
+   * @author vvakame
+   */
+  @Test
+  public void run_RPCs() {
+    Key key = Datastore.createKey("hoge", 20);
+    Entity entity = new Entity(key);
+    Datastore.put(entity);
+    Datastore.get(key);
+    Datastore.delete(key);
+    Datastore.getOrNull(key);
+  }
 
-		assertThat(Memcache.statistics().getItemCount(), is(0L));
-	}
+  @Override
+  public void setUp() throws Exception {
+    super.setUp();
 
-	/**
-	 * テストケース。
-	 * @author vvakame
-	 */
-	@Test
-	public void run_RPCs() {
-		Key key = Datastore.createKey("hoge", 20);
-		Entity entity = new Entity(key);
-		Datastore.put(entity);
-		Datastore.get(key);
-		Datastore.delete(key);
-		Datastore.getOrNull(key);
-	}
+    // かならず RpcCounterDelegate が最初
+    countDelegate = RpcCounterDelegate.install();
 
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
+    memvacheDelegate =
+        MemvacheDelegate.install(
+            StrategyBuilder.newBuilder()
+                .addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class)
+                .buid());
+    // memvacheDelegate.strategies.get().clear();
+    // memvacheDelegate.strategies.get().add(new GetPutCacheStrategy());
+  }
 
-		// かならず RpcCounterDelegate が最初
-		countDelegate = RpcCounterDelegate.install();
+  @Override
+  public void tearDown() throws Exception {
+    memvacheDelegate.uninstall();
+    countDelegate.uninstall();
 
-		memvacheDelegate = MemvacheDelegate.install(
-				StrategyBuilder.newBuilder().addStrategy(MemvacheDelegate.DATASTORE_V3, GetPutCacheStrategy.class).buid());
-		//memvacheDelegate.strategies.get().clear();
-		//memvacheDelegate.strategies.get().add(new GetPutCacheStrategy());
-	}
-
-	@Override
-	public void tearDown() throws Exception {
-		memvacheDelegate.uninstall();
-		countDelegate.uninstall();
-
-		super.tearDown();
-	}
+    super.tearDown();
+  }
 }
