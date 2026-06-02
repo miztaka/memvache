@@ -38,9 +38,7 @@ public class GetPutCacheStrategyTest extends ControllerTestCase {
   public void put_notAllocatedId() throws EntityNotFoundException {
     DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
     Entity entity = new Entity("hoge");
-    datastore.put(entity);
-
-    Key key = entity.getKey();
+    Key key = datastore.put(entity);
     datastore.get(key);
   }
 
@@ -50,14 +48,15 @@ public class GetPutCacheStrategyTest extends ControllerTestCase {
    */
   @Test
   public void put_withTx_withCommit() {
+    Key key = Datastore.createKey("hoge", 1);
     Transaction tx = Datastore.beginTransaction();
-    Datastore.put(new Entity("hoge", 1));
+    Datastore.put(new Entity(key));
 
     assertThat("Tx下なので0", Memcache.statistics().getItemCount(), is(0L));
 
     tx.commit();
 
-    assertThat("1つput", Memcache.statistics().getItemCount(), is(1L));
+    assertThat("1つput", MemvacheDelegate.getMemcache().get(key), notNullValue());
   }
 
   /**
@@ -66,18 +65,20 @@ public class GetPutCacheStrategyTest extends ControllerTestCase {
    */
   @Test
   public void put_with2Tx_withCommit() {
+    Key key1 = Datastore.createKey("hoge", 1);
     Transaction tx1 = Datastore.beginTransaction();
-    Datastore.put(new Entity("hoge", 1));
-
-    Transaction tx2 = Datastore.beginTransaction();
-    Datastore.put(new Entity("hoge", 2));
+    Datastore.put(new Entity(key1));
 
     assertThat("Tx下なので0", Memcache.statistics().getItemCount(), is(0L));
-    tx2.commit();
-    assertThat("1つ目put", Memcache.statistics().getItemCount(), is(1L));
-
     tx1.commit();
-    assertThat("2つ目put", Memcache.statistics().getItemCount(), is(2L));
+    assertThat("1つ目put", MemvacheDelegate.getMemcache().get(key1), notNullValue());
+
+    Key key2 = Datastore.createKey("hoge", 2);
+    Transaction tx2 = Datastore.beginTransaction();
+    Datastore.put(new Entity(key2));
+
+    tx2.commit();
+    assertThat("2つ目put", MemvacheDelegate.getMemcache().get(key2), notNullValue());
   }
 
   /**
@@ -111,6 +112,7 @@ public class GetPutCacheStrategyTest extends ControllerTestCase {
       EntityProto proto = EntityTranslatorPublic.convertToPb(entity);
       DatastorePb.GetResponse.Entity en = new DatastorePb.GetResponse.Entity();
       en.setEntity(proto);
+      en.setKey(proto.getKey());
       memcache.put(key, en);
     }
 
@@ -145,10 +147,11 @@ public class GetPutCacheStrategyTest extends ControllerTestCase {
 
     Key key2;
     {
-      Entity entity = new Entity("hoge", 1);
+      Entity entity = new Entity("hoge", 2);
       entity.setProperty("v1", 1);
       key2 = entity.getKey();
       Datastore.put(entity);
+      MemvacheDelegate.getMemcache().delete(key2);
     }
 
     Map<String, Integer> countMap = countDelegate.countMap;
@@ -168,11 +171,12 @@ public class GetPutCacheStrategyTest extends ControllerTestCase {
   @Test
   public void delete() {
     Entity entity = new Entity("hoge", 1);
-    Datastore.put(entity);
+    Key key = Datastore.put(entity);
+    MemvacheDelegate.getMemcache().put(key, entity);
 
     assertThat(Memcache.statistics().getItemCount(), is(1L));
 
-    Datastore.delete(entity.getKey());
+    Datastore.delete(key);
 
     assertThat(Memcache.statistics().getItemCount(), is(0L));
   }

@@ -44,6 +44,8 @@ public class QueryKeysOnlyStrategyTest extends ControllerTestCase {
       Datastore.put(entity);
     }
 
+    MemvacheDelegate.getMemcache().clearAll();
+
     List<Entity> entities = Datastore.query("hoge").asEntityList();
     assertThat(entities.size(), is(2));
     assertThat(entities.get(0).getKey(), is(Datastore.createKey("hoge", 1)));
@@ -69,6 +71,7 @@ public class QueryKeysOnlyStrategyTest extends ControllerTestCase {
       EntityProto entityProto = EntityTranslatorPublic.convertToPb(entity);
       DatastorePb.GetResponse.Entity en = new DatastorePb.GetResponse.Entity();
       en.setEntity(entityProto);
+      en.setKey(entityProto.getKey());
       memcache.put(entity.getKey(), en);
     }
     {
@@ -79,6 +82,7 @@ public class QueryKeysOnlyStrategyTest extends ControllerTestCase {
       EntityProto entityProto = EntityTranslatorPublic.convertToPb(entity);
       DatastorePb.GetResponse.Entity en = new DatastorePb.GetResponse.Entity();
       en.setEntity(entityProto);
+      en.setKey(entityProto.getKey());
       memcache.put(entity.getKey(), en);
     }
 
@@ -116,8 +120,11 @@ public class QueryKeysOnlyStrategyTest extends ControllerTestCase {
       EntityProto entityProto = EntityTranslatorPublic.convertToPb(entity);
       DatastorePb.GetResponse.Entity en = new DatastorePb.GetResponse.Entity();
       en.setEntity(entityProto);
+      en.setKey(entityProto.getKey());
       memcache.put(entity.getKey(), en);
     }
+
+    MemvacheDelegate.getMemcache().delete(Datastore.createKey("hoge", 1));
 
     Map<String, Integer> countMap = countDelegate.countMap;
     countMap.clear();

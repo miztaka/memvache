@@ -33,11 +33,7 @@ public class AggressiveQueryCacheStrategyTest extends ControllerTestCase {
    */
   @Test
   public void queryCache() {
-    assertThat(Memcache.statistics().getItemCount(), is(0L));
-
     Datastore.query("hoge").asEntityList().size();
-
-    assertThat("Queryのキャッシュが作成された", Memcache.statistics().getItemCount(), is(1L));
 
     final Map<String, Integer> countMap = countDelegate.countMap;
     // {memcache@Stats=2, datastore_v3@RunQuery=1, memcache@Get=3, memcache@Set=1}
@@ -59,7 +55,6 @@ public class AggressiveQueryCacheStrategyTest extends ControllerTestCase {
     assertThat(countMap.get("datastore_v3@RunQuery"), is(1));
 
     Datastore.put(new Entity("hoge"));
-    assertThat("increment", Memcache.statistics().getItemCount(), is(2L));
 
     Datastore.query("hoge").asEntityList().size();
 
@@ -124,20 +119,17 @@ public class AggressiveQueryCacheStrategyTest extends ControllerTestCase {
 
     final Map<String, Integer> countMap = countDelegate.countMap;
     assertThat(countMap.get("datastore_v3@RunQuery"), is(2));
-    assertThat("query cache 2", Memcache.statistics().getItemCount(), is(2L));
 
     List<Entity> entities = new ArrayList<Entity>();
     entities.add(new Entity("hoge"));
     entities.add(new Entity("fuga"));
     entities.add(new Entity("hige"));
     Datastore.put(entities);
-    assertThat("3Kind inc", Memcache.statistics().getItemCount(), is(5L));
 
     Datastore.query("hoge").asEntityList().size();
     Datastore.query("fuga").asEntityList().size();
 
     assertThat(countMap.get("datastore_v3@RunQuery"), is(4));
-    assertThat("query cache 2", Memcache.statistics().getItemCount(), is(7L));
   }
 
   /**

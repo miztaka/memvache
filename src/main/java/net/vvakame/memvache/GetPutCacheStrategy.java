@@ -239,6 +239,7 @@ public class GetPutCacheStrategy extends RpcVisitor {
       EntityProto proto = entitys.get(i);
       Reference reference = responsePb.getKey(i);
       Key key = PbKeyUtil.toKey(reference);
+      proto.setKey(reference);
       Entity entity = new Entity();
       entity.setEntity(proto);
       entity.setKey(reference);
