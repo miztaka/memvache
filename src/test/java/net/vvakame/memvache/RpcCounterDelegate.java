@@ -1,16 +1,15 @@
 package net.vvakame.memvache;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Future;
-
 import com.google.apphosting.api.ApiProxy;
 import com.google.apphosting.api.ApiProxy.ApiConfig;
 import com.google.apphosting.api.ApiProxy.ApiProxyException;
 import com.google.apphosting.api.ApiProxy.Delegate;
 import com.google.apphosting.api.ApiProxy.Environment;
 import com.google.apphosting.api.ApiProxy.LogRecord;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Future;
 
 /**
  * RPCが発生した時の Serivice@Method の回数を保持する。
@@ -18,90 +17,89 @@ import com.google.apphosting.api.ApiProxy.LogRecord;
  */
 class RpcCounterDelegate implements Delegate<Environment> {
 
-	Delegate<Environment> parent;
+  Delegate<Environment> parent;
 
-	final public Map<String, Integer> countMap = new LinkedHashMap<String, Integer>() {
+  public final Map<String, Integer> countMap =
+      new LinkedHashMap<String, Integer>() {
 
-		private static final long serialVersionUID = 1L;
+        private static final long serialVersionUID = 1L;
 
+        @Override
+        public Integer get(Object key) {
+          Integer val = super.get(key);
+          if (val != null) {
+            return val;
+          } else {
+            return 0;
+          }
+        }
+      };
 
-		@Override
-		public Integer get(Object key) {
-			Integer val = super.get(key);
-			if (val != null) {
-				return val;
-			} else {
-				return 0;
-			}
-		}
-	};
+  public static RpcCounterDelegate install() {
+    @SuppressWarnings("unchecked")
+    Delegate<Environment> originalDelegate = ApiProxy.getDelegate();
+    if (originalDelegate instanceof RpcCounterDelegate == false) {
+      RpcCounterDelegate newDelegate = new RpcCounterDelegate(originalDelegate);
+      ApiProxy.setDelegate(newDelegate);
+      return newDelegate;
+    } else {
+      return (RpcCounterDelegate) originalDelegate;
+    }
+  }
 
+  public static void uninstall(Delegate<Environment> originalDelegate) {
+    ApiProxy.setDelegate(originalDelegate);
+  }
 
-	public static RpcCounterDelegate install() {
-		@SuppressWarnings("unchecked")
-		Delegate<Environment> originalDelegate = ApiProxy.getDelegate();
-		if (originalDelegate instanceof RpcCounterDelegate == false) {
-			RpcCounterDelegate newDelegate = new RpcCounterDelegate(originalDelegate);
-			ApiProxy.setDelegate(newDelegate);
-			return newDelegate;
-		} else {
-			return (RpcCounterDelegate) originalDelegate;
-		}
-	}
+  public void uninstall() {
+    ApiProxy.setDelegate(parent);
+  }
 
-	public static void uninstall(Delegate<Environment> originalDelegate) {
-		ApiProxy.setDelegate(originalDelegate);
-	}
+  public RpcCounterDelegate(Delegate<Environment> parent) {
+    this.parent = parent;
+  }
 
-	public void uninstall() {
-		ApiProxy.setDelegate(parent);
-	}
+  @Override
+  public void flushLogs(Environment env) {
+    parent.flushLogs(env);
+  }
 
-	public RpcCounterDelegate(Delegate<Environment> parent) {
-		this.parent = parent;
-	}
+  @Override
+  public List<Thread> getRequestThreads(Environment env) {
+    return parent.getRequestThreads(env);
+  }
 
-	@Override
-	public void flushLogs(Environment env) {
-		parent.flushLogs(env);
-	}
+  @Override
+  public void log(Environment env, LogRecord log) {
+    parent.log(env, log);
+  }
 
-	@Override
-	public List<Thread> getRequestThreads(Environment env) {
-		return parent.getRequestThreads(env);
-	}
+  @Override
+  public Future<byte[]> makeAsyncCall(
+      Environment env, String packageName, String methodName, byte[] request, ApiConfig apiConfig) {
 
-	@Override
-	public void log(Environment env, LogRecord log) {
-		parent.log(env, log);
-	}
+    process(packageName, methodName, request);
 
-	@Override
-	public Future<byte[]> makeAsyncCall(Environment env, String packageName, String methodName,
-			byte[] request, ApiConfig apiConfig) {
+    return parent.makeAsyncCall(env, packageName, methodName, request, apiConfig);
+  }
 
-		process(packageName, methodName, request);
+  @Override
+  public byte[] makeSyncCall(Environment env, String packageName, String methodName, byte[] request)
+      throws ApiProxyException {
 
-		return parent.makeAsyncCall(env, packageName, methodName, request, apiConfig);
-	}
+    process(packageName, methodName, request);
 
-	@Override
-	public byte[] makeSyncCall(Environment env, String packageName, String methodName,
-			byte[] request) throws ApiProxyException {
+    return parent.makeSyncCall(env, packageName, methodName, request);
+  }
 
-		process(packageName, methodName, request);
-
-		return parent.makeSyncCall(env, packageName, methodName, request);
-	}
-
-	void process(String packageName, String methodName, byte[] request) {
-		final String key = packageName + "@" + methodName;
-		Integer count = countMap.get(key);
-		if (count == null) {
-			count = 1;
-		} else {
-			count++;
-		}
-		countMap.put(key, count);
-	}
+  void process(String packageName, String methodName, byte[] request) {
+    final String key = packageName + "@" + methodName;
+    Integer count = countMap.get(key);
+    if (count == null) {
+      count = 1;
+    } else {
+      count++;
+    }
+    countMap.put(key, count);
+  }
 }
