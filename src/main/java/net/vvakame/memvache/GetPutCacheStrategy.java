@@ -70,6 +70,10 @@ public class GetPutCacheStrategy extends RpcVisitor {
     {
       final MemcacheService memcache = MemvacheDelegate.getMemcache();
       Map<Key, Object> all = memcache.getAll(requestKeys); // 存在しなかった場合Keyごと無い
+      if (all == null) {
+        logger.severe("memcache#getAll returns null. continue.");
+        all = new HashMap<Key, Object>();
+      }
       for (Key key : all.keySet()) {
         Entity entity = (Entity) all.get(key);
         if (entity != null) {

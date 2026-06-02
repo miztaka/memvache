@@ -47,6 +47,10 @@ class MemcacheKeyUtil {
 
   public static Map<Key, Entity> conv(Map<Key, Object> map) {
     Map<Key, Entity> newMap = new HashMap<Key, Entity>();
+    if (map == null) {
+      logger.severe("cached entity map is null.");
+      return newMap;
+    }
     for (Key key : map.keySet()) {
       Entity e = (Entity) map.get(key);
       boolean valid = true;
@@ -55,9 +59,6 @@ class MemcacheKeyUtil {
         valid = false;
       } else if (e.getMutableEntity() == null) {
         logger.severe("cached entity#getMutableEntity() is null. " + key);
-        valid = false;
-      } else if (e.getMutableEntity().propertySize() == 0) {
-        logger.severe("cached entity propertySize is zero." + key);
         valid = false;
       }
       if (valid) {
