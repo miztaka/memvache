@@ -135,12 +135,12 @@ public class MemcacheServiceWrapper implements MemcacheService {
 
   @Override
   public void put(Object arg0, Object arg1) {
-    asyncService.put(arg0, arg1);
+    getQuietly(asyncService.put(arg0, arg1));
   }
 
   @Override
   public void put(Object arg0, Object arg1, Expiration arg2) {
-    asyncService.put(arg0, arg1, arg2);
+    getQuietly(asyncService.put(arg0, arg1, arg2));
   }
 
   @Override
@@ -150,12 +150,12 @@ public class MemcacheServiceWrapper implements MemcacheService {
 
   @Override
   public void putAll(Map<?, ?> arg0) {
-    asyncService.putAll(arg0);
+    getQuietly(asyncService.putAll(arg0));
   }
 
   @Override
   public void putAll(Map<?, ?> arg0, Expiration arg1) {
-    asyncService.putAll(arg0, arg1);
+    getQuietly(asyncService.putAll(arg0, arg1));
   }
 
   @Override

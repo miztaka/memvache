@@ -113,7 +113,19 @@ public class CacheService {
         memcacheKeys.add(key);
       }
     }
-    result.putAll(globalCache.getAll(memcacheKeys));
+    Map globalResults = globalCache.getAll(memcacheKeys);
+    if (globalResults == null) {
+      return result;
+    }
+    for (Object key : globalResults.keySet()) {
+      Object value = resolveChunk(globalResults.get(key));
+      if (value != null) {
+        result.put(key, value);
+        if (localCacheUsed) {
+          localCache.put(localKey((String) key), value);
+        }
+      }
+    }
     return result;
   }
 
@@ -225,16 +237,13 @@ public class CacheService {
       }
       Object value = globalCache.get(key);
       if (value != null) {
-        if (value instanceof String && ((String) value).startsWith(CHUNK_PREFIX)) {
-          // get chunk
-          value = getChunk((String) value);
-          if (value == null) {
-            logger.debug("cache chunk miss: " + key);
-            return null;
-          }
+        value = resolveChunk(value);
+        if (value == null) {
+          logger.debug("cache chunk miss: " + key);
+          return null;
         }
         if (localCacheUsed) {
-          localCache.put((String) key, value);
+          localCache.put(localKey, value);
         }
         cacheHits++;
         logger.debug("hit public cache: " + key);
@@ -314,6 +323,13 @@ public class CacheService {
 
   public int getCacheHits() {
     return cacheHits;
+  }
+
+  private Object resolveChunk(Object value) {
+    if (value instanceof String && ((String) value).startsWith(CHUNK_PREFIX)) {
+      return getChunk((String) value);
+    }
+    return value;
   }
 
   /**
