@@ -45,6 +45,8 @@ public class QueryKeysOnlyStrategyTest extends ControllerTestCase {
     }
 
     MemvacheDelegate.getMemcache().clearAll();
+    MemvacheDelegate.getMemcache().delete(Datastore.createKey("hoge", 1));
+    MemvacheDelegate.getMemcache().delete(Datastore.createKey("hoge", 2));
 
     List<Entity> entities = Datastore.query("hoge").asEntityList();
     assertThat(entities.size(), is(2));
