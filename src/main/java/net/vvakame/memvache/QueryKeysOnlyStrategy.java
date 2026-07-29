@@ -160,7 +160,7 @@ public class QueryKeysOnlyStrategy extends RpcVisitor {
     {
       Map<Key, Object> all = MemvacheDelegate.getMemcache().getAll(keys);
       if (all == null) {
-        logger.severe("memcache#getAll returns null. continue.");
+        logger.warning("memcache#getAll returns null. Possibly timeout. continue.");
         all = new LinkedHashMap<Key, Object>();
       }
       cached = MemcacheKeyUtil.conv(all);
