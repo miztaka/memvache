@@ -28,6 +28,11 @@ import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.api.datastore.Query;
 import com.google.appengine.api.memcache.InvalidValueException;
 import com.google.appengine.api.memcache.MemcacheService;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -64,7 +69,7 @@ public class CacheService {
   public static final long MEMCACHE_DEFAULT_TIMEOUT = 3000L;
 
   // Local cache.
-  private Map<String, Object> localCache;
+  private Map<String, byte[]> localCache;
   private long localCacheTime;
   private int localHits;
   private int cacheHits;
@@ -82,7 +87,7 @@ public class CacheService {
     } else {
       globalCache = new MemcacheServiceWrapper(MEMCACHE_DEFAULT_TIMEOUT);
     }
-    localCache = new HashMap<String, Object>();
+    localCache = new HashMap<String, byte[]>();
     localCacheTime = System.currentTimeMillis();
   }
 
@@ -108,10 +113,13 @@ public class CacheService {
     for (Object key : keys) {
       String localKey = localKey((String) key);
       if (localCacheUsed && localCache.containsKey(localKey)) {
-        result.put(key, localCache.get(localKey));
-      } else {
-        memcacheKeys.add(key);
+        Object value = getLocal(localKey);
+        if (value != null) {
+          result.put(key, value);
+          continue;
+        }
       }
+      memcacheKeys.add(key);
     }
     Map globalResults = globalCache.getAll(memcacheKeys);
     if (globalResults == null) {
@@ -122,7 +130,7 @@ public class CacheService {
       if (value != null) {
         result.put(key, value);
         if (localCacheUsed) {
-          localCache.put(localKey((String) key), value);
+          putLocal(localKey((String) key), value);
         }
       }
     }
@@ -215,8 +223,11 @@ public class CacheService {
    * @return
    */
   public boolean containsKey(Object arg0) {
-    if (localCacheUsed && localCache.containsKey(localKey((String) arg0))) {
-      return true;
+    if (localCacheUsed) {
+      String localKey = localKey((String) arg0);
+      if (localCache.containsKey(localKey) && getLocal(localKey) != null) {
+        return true;
+      }
     }
     return globalCache.contains(arg0);
   }
@@ -231,9 +242,12 @@ public class CacheService {
     try {
       String localKey = localKey((String) key);
       if (localCacheUsed && localCache.containsKey(localKey)) {
-        localHits++;
-        logger.debug("hit local cache: " + localKey);
-        return localCache.get(localKey);
+        Object localValue = getLocal(localKey);
+        if (localValue != null) {
+          localHits++;
+          logger.debug("hit local cache: " + localKey);
+          return localValue;
+        }
       }
       Object value = globalCache.get(key);
       if (value != null) {
@@ -243,7 +257,7 @@ public class CacheService {
           return null;
         }
         if (localCacheUsed) {
-          localCache.put(localKey, value);
+          putLocal(localKey, value);
         }
         cacheHits++;
         logger.debug("hit public cache: " + key);
@@ -267,8 +281,7 @@ public class CacheService {
   public Object put(Object key, Object value) {
 
     if (localCacheUsed) {
-      String localKey = localKey((String) key);
-      localCache.put(localKey, value);
+      putLocal(localKey((String) key), value);
     }
     try {
       putChunk(key, value);
@@ -287,8 +300,7 @@ public class CacheService {
 
     for (Object key : map.keySet()) {
       if (localCacheUsed) {
-        String localKey = localKey((String) key);
-        localCache.put(localKey, map.get(key));
+        putLocal(localKey((String) key), map.get(key));
       }
     }
     // localCache.putAll(map);
@@ -405,6 +417,36 @@ public class CacheService {
     globalCache.putAll(cacheData);
 
     return;
+  }
+
+  private void putLocal(String key, Object value) {
+    if (value == null) {
+      localCache.remove(key);
+      return;
+    }
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    try (ObjectOutputStream objectOutput = new ObjectOutputStream(output)) {
+      objectOutput.writeObject(value);
+      objectOutput.flush();
+      localCache.put(key, output.toByteArray());
+    } catch (IOException e) {
+      localCache.remove(key);
+      logger.error("Failed to serialize local cache value: " + key, e);
+    }
+  }
+
+  private Object getLocal(String key) {
+    byte[] snapshot = localCache.get(key);
+    if (snapshot == null) {
+      return null;
+    }
+    try (ObjectInputStream input = new ObjectInputStream(new ByteArrayInputStream(snapshot))) {
+      return input.readObject();
+    } catch (IOException | ClassNotFoundException e) {
+      localCache.remove(key);
+      logger.error("Failed to deserialize local cache value: " + key, e);
+      return null;
+    }
   }
 
   protected String localKey(String key) {
