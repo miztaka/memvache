@@ -105,6 +105,32 @@ public class CacheServiceTest extends AppEngineTestCase {
   }
 
   @Test
+  public void put_withoutLocalCacheRemovesExistingLocalValue() throws Exception {
+    CacheService cache = new CacheService();
+    cache.put("memcache-only-put", "local-value");
+
+    cache.put("memcache-only-put", "global-value", false);
+
+    assertFalse(localCache(cache).containsKey(cache.localKey("memcache-only-put")));
+    assertThat(cache.get("memcache-only-put", false), is((Object) "global-value"));
+    assertFalse(localCache(cache).containsKey(cache.localKey("memcache-only-put")));
+  }
+
+  @Test
+  public void get_withoutLocalCacheRemovesAndBypassesExistingLocalValue() throws Exception {
+    CacheService cache = new CacheService();
+    cache.put("memcache-only-get", "local-value");
+
+    CacheService globalWriter = new CacheService();
+    globalWriter.put("memcache-only-get", "global-value", false);
+
+    assertThat(cache.get("memcache-only-get", false), is((Object) "global-value"));
+    assertFalse(localCache(cache).containsKey(cache.localKey("memcache-only-get")));
+    assertThat(cache.getLocalHits(), is(0));
+    assertThat(cache.getCacheHits(), is(1));
+  }
+
+  @Test
   public void put_nullValueDoesNotRemainInLocalCache() throws Exception {
     CacheService cache = new CacheService();
     cache.put("nullable", "existing");

@@ -239,9 +239,24 @@ public class CacheService {
    * @return
    */
   public Object get(Object key) {
+    return get(key, true);
+  }
+
+  /**
+   * Get cache by key.
+   *
+   * @param key
+   * @param useLocalCache whether to read from and write to the local cache for this call
+   * @return
+   */
+  public Object get(Object key, boolean useLocalCache) {
     try {
       String localKey = localKey((String) key);
-      if (localCacheUsed && localCache.containsKey(localKey)) {
+      boolean useLocal = localCacheUsed && useLocalCache;
+      if (!useLocalCache) {
+        localCache.remove(localKey);
+      }
+      if (useLocal && localCache.containsKey(localKey)) {
         Object localValue = getLocal(localKey);
         if (localValue != null) {
           localHits++;
@@ -256,7 +271,7 @@ public class CacheService {
           logger.debug("cache chunk miss: " + key);
           return null;
         }
-        if (localCacheUsed) {
+        if (useLocal) {
           putLocal(localKey, value);
         }
         cacheHits++;
@@ -279,9 +294,23 @@ public class CacheService {
    * @return
    */
   public Object put(Object key, Object value) {
+    return put(key, value, true);
+  }
 
-    if (localCacheUsed) {
-      putLocal(localKey((String) key), value);
+  /**
+   * Put cache for the key.
+   *
+   * @param key
+   * @param value
+   * @param useLocalCache whether to write to the local cache for this call
+   * @return
+   */
+  public Object put(Object key, Object value, boolean useLocalCache) {
+    String localKey = localKey((String) key);
+    if (!useLocalCache) {
+      localCache.remove(localKey);
+    } else if (localCacheUsed) {
+      putLocal(localKey, value);
     }
     try {
       putChunk(key, value);
@@ -473,24 +502,19 @@ public class CacheService {
    * @return
    */
   public CacheItem getCacheItem(String key) {
+    return getCacheItem(key, true);
+  }
 
-    CacheItem item = (CacheItem) get(key);
+  /**
+   * CacheItemクラスとして登録されているキャッシュを取得します。
+   * Blobにも対応しています。
+   *
+   * @param key
+   * @param useLocalCache whether to read from and write to the local cache for this call
+   * @return
+   */
+  public CacheItem getCacheItem(String key, boolean useLocalCache) {
+    CacheItem item = (CacheItem) get(key, useLocalCache);
     return item;
-
-    /*
-    Object cachedData = get(key);
-    if (cachedData != null) {
-              if (cachedData instanceof CacheItem) {
-                  return (CacheItem)cachedData;
-              } else {
-                  byte[] rawdata = getBlob(key);
-                  if (rawdata != null) {
-                  	CacheItem item = (CacheItem)StreamUtil.toObject(rawdata);
-                  	return item;
-                  }
-              }
-    }
-      	return null;
-      	*/
   }
 }
