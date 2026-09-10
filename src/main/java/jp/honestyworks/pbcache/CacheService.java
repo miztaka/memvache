@@ -260,7 +260,8 @@ public class CacheService {
         Object localValue = getLocal(localKey);
         if (localValue != null) {
           localHits++;
-          logger.debug("hit local cache: " + localKey);
+          logger.info("hit local cache: " + localKey);
+          logger.info("localHits/cacheHits:" + localHits + "/" + cacheHits);
           return localValue;
         }
       }
